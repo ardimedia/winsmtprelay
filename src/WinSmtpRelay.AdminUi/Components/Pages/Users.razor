@@ -1,6 +1,8 @@
 @page "/users"
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
+@using WinSmtpRelay.Storage
+@using Microsoft.EntityFrameworkCore
 @inject IServiceScopeFactory ScopeFactory
 
 <div class="flex justify-between items-center mb-1">
@@ -33,6 +35,7 @@
             <th>ID</th>
             <th>Username</th>
             <th>Enabled</th>
+            <th>Allowed Senders</th>
             <th>Rate Limit</th>
             <th>Created</th>
             <th>Actions</th>
@@ -41,7 +44,7 @@
     <tbody>
         @if (users.Count == 0)
         {
-            <tr><td colspan="6" class="text-muted">No users configured</td></tr>
+            <tr><td colspan="7" class="text-muted">No users configured</td></tr>
         }
         @foreach (var user in users)
         {
@@ -49,12 +52,16 @@
                 <td class="mono">@user.Id</td>
                 <td>@user.Username</td>
                 <td>@(user.IsEnabled ? "Yes" : "No")</td>
+                <td class="text-muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
+                    @(string.IsNullOrEmpty(user.AllowedSenderAddresses) ? "Any" : user.AllowedSenderAddresses)
+                </td>
                 <td class="text-muted">
                     @(user.RateLimitPerMinute.HasValue ? $"{user.RateLimitPerMinute}/min" : "—")
                     @(user.RateLimitPerDay.HasValue ? $", {user.RateLimitPerDay}/day" : "")
                 </td>
                 <td>@user.CreatedUtc.ToString("yyyy-MM-dd")</td>
                 <td>
+                    <button class="btn btn-sm" @onclick="() => StartEdit(user)">Edit</button>
                     <button class="btn btn-sm btn-danger" @onclick="() => DeleteUserAsync(user.Id)">Delete</button>
                 </td>
             </tr>
@@ -62,11 +69,45 @@
     </tbody>
 </table>
 
+@if (editingUser is not null)
+{
+    <div class="card mt-1" style="max-width:500px">
+        <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Edit: @editingUser.Username</h3>
+        <div class="form-group">
+            <label>Enabled</label>
+            <select @bind="editEnabled">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Allowed Sender Addresses <span class="text-muted">(semicolon-separated, empty = any)</span></label>
+            <input @bind="editAllowedSenders" placeholder="user@@example.com;noreply@@example.com" />
+        </div>
+        <div class="form-group">
+            <label>Rate Limit per Minute <span class="text-muted">(empty = unlimited)</span></label>
+            <input type="number" @bind="editRatePerMinute" placeholder="unlimited" />
+        </div>
+        <div class="form-group">
+            <label>Rate Limit per Day <span class="text-muted">(empty = unlimited)</span></label>
+            <input type="number" @bind="editRatePerDay" placeholder="unlimited" />
+        </div>
+        <button class="btn btn-primary" @onclick="SaveEditAsync">Save</button>
+        <button class="btn btn-sm" @onclick="CancelEdit" style="margin-left:0.5rem">Cancel</button>
+    </div>
+}
+
 @code {
     private IReadOnlyList<RelayUser> users = [];
     private string newUsername = "";
     private string newPassword = "";
     private string? statusMessage;
+
+    private RelayUser? editingUser;
+    private string editEnabled = "true";
+    private string editAllowedSenders = "";
+    private int? editRatePerMinute;
+    private int? editRatePerDay;
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();
 
@@ -96,12 +137,44 @@
         await RefreshAsync();
     }
 
+    private void StartEdit(RelayUser user)
+    {
+        editingUser = user;
+        editEnabled = user.IsEnabled.ToString().ToLowerInvariant();
+        editAllowedSenders = user.AllowedSenderAddresses ?? "";
+        editRatePerMinute = user.RateLimitPerMinute;
+        editRatePerDay = user.RateLimitPerDay;
+    }
+
+    private void CancelEdit() => editingUser = null;
+
+    private async Task SaveEditAsync()
+    {
+        if (editingUser is null) return;
+
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+        var user = await db.RelayUsers.FindAsync(editingUser.Id);
+        if (user is null) return;
+
+        user.IsEnabled = editEnabled == "true";
+        user.AllowedSenderAddresses = string.IsNullOrWhiteSpace(editAllowedSenders) ? null : editAllowedSenders.Trim();
+        user.RateLimitPerMinute = editRatePerMinute;
+        user.RateLimitPerDay = editRatePerDay;
+        await db.SaveChangesAsync();
+
+        statusMessage = $"User '{user.Username}' updated";
+        editingUser = null;
+        await RefreshAsync();
+    }
+
     private async Task DeleteUserAsync(int id)
     {
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IUserService>();
         await svc.DeleteUserAsync(id);
         statusMessage = "User deleted";
+        editingUser = null;
         await RefreshAsync();
     }
 }

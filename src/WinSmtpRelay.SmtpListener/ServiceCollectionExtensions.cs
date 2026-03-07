@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<EmailAuthenticationService>();
         services.AddSingleton<RateLimiter>();
         services.AddHostedService<SmtpRelayServer>();
+        services.AddHostedService<PickupFolderService>();
 
         return services;
     }

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -53,9 +54,11 @@ public class SmtpRelayServer : BackgroundService
 
         foreach (var endpoint in _config.Endpoints)
         {
+            var listenAddress = IPAddress.Parse(endpoint.Address);
             optionsBuilder.Endpoint(builder =>
             {
                 builder.Port(endpoint.Port, endpoint.ImplicitTls);
+                builder.Endpoint(new IPEndPoint(listenAddress, endpoint.Port));
 
                 if (endpoint.RequireAuth)
                     builder.AllowUnsecureAuthentication(false);

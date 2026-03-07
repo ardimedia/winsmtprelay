@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
+    <ProjectReference Include="..\WinSmtpRelay.Security\WinSmtpRelay.Security.csproj" />
     <ProjectReference Include="..\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
   </ItemGroup>
 

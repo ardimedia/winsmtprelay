@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using WinSmtpRelay.Core.Interfaces;
 using WinSmtpRelay.Core.Models;
+using WinSmtpRelay.Security;
 using WinSmtpRelay.Storage;
 
 namespace WinSmtpRelay.AdminApi;
@@ -15,9 +17,11 @@ public static class AdminEndpoints
         var group = endpoints.MapGroup("/api");
 
         MapHealthEndpoints(group);
+        MapMetricsEndpoints(group);
         MapQueueEndpoints(group);
         MapDeliveryLogEndpoints(group);
         MapUserEndpoints(group);
+        MapDkimEndpoints(group);
         MapServerEndpoints(group);
 
         return endpoints;
@@ -30,6 +34,31 @@ public static class AdminEndpoints
             Status = "Healthy",
             Timestamp = DateTime.UtcNow
         }));
+    }
+
+    private static void MapMetricsEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/metrics", async (IMessageQueue q, RelayDbContext db, CancellationToken ct) =>
+        {
+            var process = Process.GetCurrentProcess();
+            var queueDepth = await q.GetQueueDepthAsync(ct);
+            var totalDeliveries = await db.DeliveryLogs.CountAsync(ct);
+            var failedDeliveries = await db.DeliveryLogs.CountAsync(l => l.StatusCode.StartsWith("5"), ct);
+            var totalMessages = await db.QueuedMessages.CountAsync(ct);
+
+            return Results.Ok(new
+            {
+                Timestamp = DateTime.UtcNow,
+                Queue = new { Depth = queueDepth, TotalProcessed = totalMessages },
+                Deliveries = new { Total = totalDeliveries, Failed = failedDeliveries },
+                Process = new
+                {
+                    UptimeSeconds = (DateTime.UtcNow - process.StartTime.ToUniversalTime()).TotalSeconds,
+                    MemoryMB = process.WorkingSet64 / (1024.0 * 1024.0),
+                    ThreadCount = process.Threads.Count
+                }
+            });
+        });
     }
 
     private static void MapQueueEndpoints(RouteGroupBuilder group)
@@ -100,10 +129,43 @@ public static class AdminEndpoints
             return Results.Created($"/api/users/{req.Username}", new { Message = "User created" });
         });
 
+        users.MapPut("/{id:int}", async (int id, UpdateUserRequest req, RelayDbContext db, CancellationToken ct) =>
+        {
+            var user = await db.RelayUsers.FindAsync([id], ct);
+            if (user is null) return Results.NotFound();
+
+            user.AllowedSenderAddresses = req.AllowedSenderAddresses;
+            user.RateLimitPerMinute = req.RateLimitPerMinute;
+            user.RateLimitPerDay = req.RateLimitPerDay;
+            user.IsEnabled = req.IsEnabled;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { Message = "User updated" });
+        });
+
         users.MapDelete("/{id:int}", async (int id, IUserService svc, CancellationToken ct) =>
         {
             await svc.DeleteUserAsync(id, ct);
             return Results.Ok(new { Message = "User deleted" });
+        });
+    }
+
+    private static void MapDkimEndpoints(RouteGroupBuilder group)
+    {
+        group.MapPost("/dkim/generate", (DkimGenerateRequest req) =>
+        {
+            var (privateKey, publicKey, dnsTxt) = DkimKeyGenerator.GenerateKeyPair(
+                req.Domain, req.Selector, req.KeySize > 0 ? req.KeySize : 2048);
+
+            return Results.Ok(new
+            {
+                Domain = req.Domain,
+                Selector = req.Selector,
+                PrivateKeyPem = privateKey,
+                PublicKeyPem = publicKey,
+                DnsRecord = $"{req.Selector}._domainkey.{req.Domain}",
+                DnsTxtValue = dnsTxt
+            });
         });
     }
 
@@ -167,6 +229,12 @@ public record UserSummary(
     int? RateLimitPerMinute, int? RateLimitPerDay, DateTime CreatedUtc);
 
 public record CreateUserRequest(string Username, string Password);
+
+public record UpdateUserRequest(
+    bool IsEnabled, string? AllowedSenderAddresses,
+    int? RateLimitPerMinute, int? RateLimitPerDay);
+
+public record DkimGenerateRequest(string Domain, string Selector, int KeySize = 2048);
 
 public record DeliveryLogSummary(
     long Id, long QueuedMessageId, string Recipient, string StatusCode,
