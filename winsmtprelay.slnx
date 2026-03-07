@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WinSmtpRelay.AdminApi/WinSmtpRelay.AdminApi.csproj" />
+    <Project Path="src/WinSmtpRelay.AdminUi/WinSmtpRelay.AdminUi.csproj" />
+    <Project Path="src/WinSmtpRelay.Core/WinSmtpRelay.Core.csproj" />
+    <Project Path="src/WinSmtpRelay.Delivery/WinSmtpRelay.Delivery.csproj" />
+    <Project Path="src/WinSmtpRelay.Security/WinSmtpRelay.Security.csproj" />
+    <Project Path="src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj" />
+    <Project Path="src/WinSmtpRelay.SmtpListener/WinSmtpRelay.SmtpListener.csproj" />
+    <Project Path="src/WinSmtpRelay.Storage/WinSmtpRelay.Storage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WinSmtpRelay.Core.Tests/WinSmtpRelay.Core.Tests.csproj" />
+    <Project Path="tests/WinSmtpRelay.Delivery.Tests/WinSmtpRelay.Delivery.Tests.csproj" />
+    <Project Path="tests/WinSmtpRelay.Integration.Tests/WinSmtpRelay.Integration.Tests.csproj" />
+    <Project Path="tests/WinSmtpRelay.Security.Tests/WinSmtpRelay.Security.Tests.csproj" />
+    <Project Path="tests/WinSmtpRelay.SmtpListener.Tests/WinSmtpRelay.SmtpListener.Tests.csproj" />
+  </Folder>
+</Solution>

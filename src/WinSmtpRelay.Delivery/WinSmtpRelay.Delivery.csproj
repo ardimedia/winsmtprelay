@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WinSmtpRelay.Delivery</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MailKit" Version="4.*" />
+    <PackageReference Include="DnsClient" Version="1.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
+    <ProjectReference Include="..\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
+  </ItemGroup>
+
+</Project>

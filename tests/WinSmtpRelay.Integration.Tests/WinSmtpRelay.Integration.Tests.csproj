@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
+    <ProjectReference Include="..\..\src\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
+    <ProjectReference Include="..\..\src\WinSmtpRelay.SmtpListener\WinSmtpRelay.SmtpListener.csproj" />
+    <ProjectReference Include="..\..\src\WinSmtpRelay.Delivery\WinSmtpRelay.Delivery.csproj" />
+  </ItemGroup>
+
+</Project>

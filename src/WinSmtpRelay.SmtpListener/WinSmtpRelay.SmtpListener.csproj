@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WinSmtpRelay.SmtpListener</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
+    <PackageReference Include="SmtpServer" Version="11.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
+    <ProjectReference Include="..\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
+  </ItemGroup>
+
+</Project>
