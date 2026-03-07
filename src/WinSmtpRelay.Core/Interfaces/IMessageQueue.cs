@@ -9,5 +9,6 @@ public interface IMessageQueue
     Task UpdateStatusAsync(long messageId, MessageStatus status, string? error = null, CancellationToken cancellationToken = default);
     Task<QueuedMessage?> GetByIdAsync(long messageId, CancellationToken cancellationToken = default);
     Task<int> GetQueueDepthAsync(CancellationToken cancellationToken = default);
+    Task SetRetryAsync(long messageId, int retryCount, DateTime nextRetryUtc, CancellationToken cancellationToken = default);
     Task DeleteAsync(long messageId, CancellationToken cancellationToken = default);
 }

@@ -43,6 +43,16 @@ public class MessageQueue(RelayDbContext db) : IMessageQueue
         return await db.QueuedMessages.CountAsync(m => m.Status == MessageStatus.Queued, cancellationToken);
     }
 
+    public async Task SetRetryAsync(long messageId, int retryCount, DateTime nextRetryUtc, CancellationToken cancellationToken = default)
+    {
+        await db.QueuedMessages
+            .Where(m => m.Id == messageId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.RetryCount, retryCount)
+                .SetProperty(m => m.NextRetryUtc, nextRetryUtc),
+                cancellationToken);
+    }
+
     public async Task DeleteAsync(long messageId, CancellationToken cancellationToken = default)
     {
         await db.QueuedMessages.Where(m => m.Id == messageId).ExecuteDeleteAsync(cancellationToken);

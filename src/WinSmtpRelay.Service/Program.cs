@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using WinSmtpRelay.Core.Configuration;
+using WinSmtpRelay.Delivery;
+using WinSmtpRelay.SmtpListener;
 using WinSmtpRelay.Storage;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -16,10 +19,22 @@ builder.Services.Configure<DeliveryOptions>(builder.Configuration.GetSection(Del
 var connectionString = builder.Configuration.GetConnectionString("RelayDb") ?? "Data Source=winsmtprelay.db";
 builder.Services.AddRelayStorage(connectionString);
 
-// TODO: Phase 1 — Add SmtpListener hosted service
-// TODO: Phase 1 — Add DeliveryWorker hosted service
+// SMTP Listener
+builder.Services.AddSmtpListener();
+
+// Delivery Engine
+builder.Services.AddDeliveryEngine();
+
 // TODO: Phase 3 — Add AdminApi endpoints
 // TODO: Phase 3 — Add AdminUi Blazor
 
 var host = builder.Build();
-host.Run();
+
+// Auto-apply EF Core migrations on startup
+using (var scope = host.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+await host.RunAsync();

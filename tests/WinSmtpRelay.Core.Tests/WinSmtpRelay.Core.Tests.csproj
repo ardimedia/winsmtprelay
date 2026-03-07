@@ -9,10 +9,12 @@
 
   <ItemGroup>
     <PackageReference Include="MSTest" Version="4.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
+    <ProjectReference Include="..\..\src\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
   </ItemGroup>
 
 </Project>

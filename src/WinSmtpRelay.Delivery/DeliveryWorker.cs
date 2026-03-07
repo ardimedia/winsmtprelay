@@ -4,25 +4,142 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
 
 namespace WinSmtpRelay.Delivery;
 
-/// <summary>
-/// Background service that polls the message queue and delivers messages.
-/// </summary>
 public class DeliveryWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<DeliveryOptions> options,
     ILogger<DeliveryWorker> logger) : BackgroundService
 {
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var config = options.Value;
         logger.LogInformation("Delivery worker starting with {MaxConcurrent} concurrent deliveries",
             config.MaxConcurrentDeliveries);
 
-        // TODO: Phase 1 — Poll queue, deliver via MailKit, handle retries + bounces
+        using var semaphore = new SemaphoreSlim(config.MaxConcurrentDeliveries);
 
-        await Task.Delay(Timeout.Infinite, stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+
+                var pending = await queue.GetPendingAsync(config.MaxConcurrentDeliveries, stoppingToken);
+
+                if (pending.Count == 0)
+                {
+                    await Task.Delay(PollInterval, stoppingToken);
+                    continue;
+                }
+
+                var tasks = pending.Select(async message =>
+                {
+                    await semaphore.WaitAsync(stoppingToken);
+                    try
+                    {
+                        await ProcessMessageAsync(message, stoppingToken);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                await Task.WhenAll(tasks);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Delivery worker error");
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+            }
+        }
+
+        logger.LogInformation("Delivery worker shutting down");
+    }
+
+    private async Task ProcessMessageAsync(QueuedMessage message, CancellationToken cancellationToken)
+    {
+        var config = options.Value;
+
+        using var scope = scopeFactory.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        var deliveryService = scope.ServiceProvider.GetRequiredService<IDeliveryService>();
+
+        await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivering, cancellationToken: cancellationToken);
+
+        try
+        {
+            await deliveryService.DeliverAsync(message, cancellationToken);
+            await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivered, cancellationToken: cancellationToken);
+
+            logger.LogInformation("Message {MessageId} (id={QueueId}) delivered successfully",
+                message.MessageId, message.Id);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Delivery failed for message {MessageId} (id={QueueId}), attempt {Attempt}",
+                message.MessageId, message.Id, message.RetryCount + 1);
+
+            message.RetryCount++;
+            message.LastError = ex.Message;
+
+            var nextRetry = CalculateNextRetry(message.RetryCount, config);
+
+            if (nextRetry == null || IsPermanentFailure(ex))
+            {
+                await queue.UpdateStatusAsync(message.Id, MessageStatus.Bounced, ex.Message, cancellationToken);
+                logger.LogWarning("Message {MessageId} (id={QueueId}) bounced: {Error}",
+                    message.MessageId, message.Id, ex.Message);
+            }
+            else
+            {
+                await queue.UpdateStatusAsync(message.Id, MessageStatus.Queued, ex.Message, cancellationToken);
+                await queue.SetRetryAsync(message.Id, message.RetryCount, nextRetry.Value, cancellationToken);
+            }
+        }
+    }
+
+    internal static DateTime? CalculateNextRetry(int retryCount, DeliveryOptions config)
+    {
+        if (retryCount <= 0)
+            return DateTime.UtcNow;
+
+        var intervals = config.RetryIntervalsMinutes;
+        if (intervals.Length == 0)
+            return null;
+
+        var intervalIndex = Math.Min(retryCount - 1, intervals.Length - 1);
+        var delayMinutes = intervals[intervalIndex];
+
+        // Check if total retry time exceeds max window
+        // Sum configured intervals, then add repeated last interval for retries beyond the array
+        var totalMinutes = intervals.Sum();
+        if (retryCount > intervals.Length)
+            totalMinutes += (retryCount - intervals.Length) * intervals[^1];
+        if (totalMinutes > config.MaxRetryHours * 60)
+            return null;
+
+        return DateTime.UtcNow.AddMinutes(delayMinutes);
+    }
+
+    private static bool IsPermanentFailure(Exception ex)
+    {
+        var message = ex.Message;
+        return message.StartsWith("5") ||
+               message.Contains("550") ||
+               message.Contains("551") ||
+               message.Contains("552") ||
+               message.Contains("553") ||
+               message.Contains("554");
     }
 }
