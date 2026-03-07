@@ -6,6 +6,7 @@ using MimeKit;
 using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
 using WinSmtpRelay.Core.Models;
+using WinSmtpRelay.Security;
 
 namespace WinSmtpRelay.Delivery;
 
@@ -13,21 +14,28 @@ public class SmtpDeliveryService : IDeliveryService
 {
     private readonly IMxResolver _mxResolver;
     private readonly DeliveryOptions _config;
+    private readonly DkimSigningService _dkimSigner;
     private readonly ILogger<SmtpDeliveryService> _logger;
 
     public SmtpDeliveryService(
         IMxResolver mxResolver,
         IOptions<DeliveryOptions> options,
+        DkimSigningService dkimSigner,
         ILogger<SmtpDeliveryService> logger)
     {
         _mxResolver = mxResolver;
         _config = options.Value;
+        _dkimSigner = dkimSigner;
         _logger = logger;
     }
 
     public async Task DeliverAsync(QueuedMessage message, CancellationToken cancellationToken = default)
     {
         var mimeMessage = await MimeMessage.LoadAsync(new MemoryStream(message.RawMessage), cancellationToken);
+
+        // DKIM-sign before sending (no-op if not configured for sender domain)
+        _dkimSigner.Sign(mimeMessage);
+
         var recipients = message.Recipients.Split(';', StringSplitOptions.RemoveEmptyEntries);
 
         // Group recipients by domain for efficient delivery

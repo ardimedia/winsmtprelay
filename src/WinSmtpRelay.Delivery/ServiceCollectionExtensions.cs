@@ -1,6 +1,7 @@
 using DnsClient;
 using Microsoft.Extensions.DependencyInjection;
 using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Security;
 
 namespace WinSmtpRelay.Delivery;
 
@@ -10,6 +11,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<ILookupClient>(new LookupClient());
         services.AddSingleton<IMxResolver, MxResolver>();
+        services.AddSingleton<DkimSigningService>();
         services.AddScoped<IDeliveryService, SmtpDeliveryService>();
         services.AddHostedService<DeliveryWorker>();
 

@@ -12,6 +12,7 @@ public static class ServiceCollectionExtensions
             options.UseSqlite(connectionString, sqlite => sqlite.MigrationsAssembly("WinSmtpRelay.Storage")));
 
         services.AddScoped<IMessageQueue, MessageQueue>();
+        services.AddScoped<IUserService, UserService>();
 
         return services;
     }

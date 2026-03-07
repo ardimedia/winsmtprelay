@@ -14,6 +14,8 @@ builder.Services.AddWindowsService(options =>
 // Configuration
 builder.Services.Configure<SmtpListenerOptions>(builder.Configuration.GetSection(SmtpListenerOptions.SectionName));
 builder.Services.Configure<DeliveryOptions>(builder.Configuration.GetSection(DeliveryOptions.SectionName));
+builder.Services.Configure<TlsOptions>(builder.Configuration.GetSection(TlsOptions.SectionName));
+builder.Services.Configure<DkimOptions>(builder.Configuration.GetSection(DkimOptions.SectionName));
 
 // Storage
 var connectionString = builder.Configuration.GetConnectionString("RelayDb") ?? "Data Source=winsmtprelay.db";
