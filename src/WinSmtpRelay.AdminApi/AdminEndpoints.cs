@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
 
 namespace WinSmtpRelay.AdminApi;
 
@@ -10,12 +12,125 @@ public static class AdminEndpoints
     {
         var group = endpoints.MapGroup("/api");
 
-        group.MapGet("/health", () => Results.Ok(new { Status = "Healthy" }));
-
-        // TODO: Phase 3 — Queue status, message list/retry/delete
-        // TODO: Phase 3 — Relay rules CRUD, domain routing CRUD
-        // TODO: Phase 3 — Metrics endpoint
+        MapHealthEndpoints(group);
+        MapQueueEndpoints(group);
+        MapUserEndpoints(group);
+        MapServerEndpoints(group);
 
         return endpoints;
     }
+
+    private static void MapHealthEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/health", () => Results.Ok(new
+        {
+            Status = "Healthy",
+            Timestamp = DateTime.UtcNow
+        }));
+    }
+
+    private static void MapQueueEndpoints(RouteGroupBuilder group)
+    {
+        var queue = group.MapGroup("/queue");
+
+        queue.MapGet("/status", async (IMessageQueue q, CancellationToken ct) =>
+        {
+            var depth = await q.GetQueueDepthAsync(ct);
+            return Results.Ok(new QueueStatusResponse(depth));
+        });
+
+        queue.MapGet("/messages", async (IMessageQueue q, CancellationToken ct,
+            int limit = 50) =>
+        {
+            var messages = await q.GetPendingAsync(limit, ct);
+            return Results.Ok(messages.Select(m => new MessageSummary(
+                m.Id, m.MessageId, m.Sender, m.Recipients, m.SizeBytes,
+                m.Status, m.RetryCount, m.LastError, m.CreatedUtc, m.NextRetryUtc, m.CompletedUtc)));
+        });
+
+        queue.MapGet("/messages/{id:long}", async (long id, IMessageQueue q, CancellationToken ct) =>
+        {
+            var msg = await q.GetByIdAsync(id, ct);
+            return msg is null ? Results.NotFound() : Results.Ok(msg);
+        });
+
+        queue.MapPost("/messages/{id:long}/retry", async (long id, IMessageQueue q, CancellationToken ct) =>
+        {
+            var msg = await q.GetByIdAsync(id, ct);
+            if (msg is null) return Results.NotFound();
+            if (msg.Status is not (MessageStatus.Failed or MessageStatus.Bounced))
+                return Results.BadRequest(new { Error = "Only failed or bounced messages can be retried" });
+
+            await q.UpdateStatusAsync(id, MessageStatus.Queued, null, ct);
+            await q.SetRetryAsync(id, 0, DateTime.UtcNow, ct);
+            return Results.Ok(new { Message = "Message re-queued for delivery" });
+        });
+
+        queue.MapDelete("/messages/{id:long}", async (long id, IMessageQueue q, CancellationToken ct) =>
+        {
+            var msg = await q.GetByIdAsync(id, ct);
+            if (msg is null) return Results.NotFound();
+            await q.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "Message deleted" });
+        });
+    }
+
+    private static void MapUserEndpoints(RouteGroupBuilder group)
+    {
+        var users = group.MapGroup("/users");
+
+        users.MapGet("/", async (IUserService svc, CancellationToken ct) =>
+        {
+            var all = await svc.GetAllUsersAsync(ct);
+            return Results.Ok(all.Select(u => new UserSummary(
+                u.Id, u.Username, u.IsEnabled, u.AllowedSenderAddresses,
+                u.RateLimitPerMinute, u.RateLimitPerDay, u.CreatedUtc)));
+        });
+
+        users.MapPost("/", async (CreateUserRequest req, IUserService svc, CancellationToken ct) =>
+        {
+            var existing = await svc.GetByUsernameAsync(req.Username, ct);
+            if (existing is not null)
+                return Results.Conflict(new { Error = $"User '{req.Username}' already exists" });
+
+            await svc.CreateUserAsync(req.Username, req.Password, ct);
+            return Results.Created($"/api/users/{req.Username}", new { Message = "User created" });
+        });
+
+        users.MapDelete("/{id:int}", async (int id, IUserService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteUserAsync(id, ct);
+            return Results.Ok(new { Message = "User deleted" });
+        });
+    }
+
+    private static void MapServerEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/server/info", () =>
+        {
+            var assembly = typeof(AdminEndpoints).Assembly;
+            var version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+
+            return Results.Ok(new
+            {
+                Version = version,
+                Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+                OS = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+                StartedUtc = System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()
+            });
+        });
+    }
 }
+
+public record QueueStatusResponse(int Depth);
+
+public record MessageSummary(
+    long Id, string MessageId, string Sender, string Recipients, int SizeBytes,
+    MessageStatus Status, int RetryCount, string? LastError,
+    DateTime CreatedUtc, DateTime? NextRetryUtc, DateTime? CompletedUtc);
+
+public record UserSummary(
+    int Id, string Username, bool IsEnabled, string? AllowedSenderAddresses,
+    int? RateLimitPerMinute, int? RateLimitPerDay, DateTime CreatedUtc);
+
+public record CreateUserRequest(string Username, string Password);

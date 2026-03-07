@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+
+<div class="app">
+    <nav class="sidebar">
+        <div class="brand">
+            <h2>WinSmtpRelay</h2>
+        </div>
+        <ul class="nav-menu">
+            <li><NavLink href="" Match="NavLinkMatch.All">Dashboard</NavLink></li>
+            <li><NavLink href="queue">Queue</NavLink></li>
+            <li><NavLink href="users">Users</NavLink></li>
+            <li><NavLink href="config">Configuration</NavLink></li>
+        </ul>
+    </nav>
+    <main class="content">
+        @Body
+    </main>
+</div>

@@ -1,0 +1,97 @@
+@page "/queue"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<div class="flex justify-between items-center mb-1">
+    <h1>Message Queue</h1>
+    <button class="btn btn-primary" @onclick="RefreshAsync">Refresh</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Message-ID</th>
+            <th>Sender</th>
+            <th>Recipients</th>
+            <th>Size</th>
+            <th>Status</th>
+            <th>Retries</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (messages.Count == 0)
+        {
+            <tr><td colspan="9" class="text-muted">Queue is empty</td></tr>
+        }
+        @foreach (var msg in messages)
+        {
+            <tr>
+                <td class="mono">@msg.Id</td>
+                <td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">@msg.MessageId</td>
+                <td>@msg.Sender</td>
+                <td>@msg.Recipients</td>
+                <td>@FormatSize(msg.SizeBytes)</td>
+                <td><span class="badge badge-@msg.Status.ToString().ToLowerInvariant()">@msg.Status</span></td>
+                <td>@msg.RetryCount</td>
+                <td>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                <td class="flex gap-1">
+                    @if (msg.Status is MessageStatus.Failed or MessageStatus.Bounced)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="() => RetryAsync(msg.Id)">Retry</button>
+                    }
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(msg.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <p class="mt-1 text-muted">@statusMessage</p>
+}
+
+@code {
+    private IReadOnlyList<QueuedMessage> messages = [];
+    private string? statusMessage;
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        messages = await queue.GetPendingAsync(100);
+        statusMessage = null;
+    }
+
+    private async Task RetryAsync(long id)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        await queue.UpdateStatusAsync(id, MessageStatus.Queued);
+        await queue.SetRetryAsync(id, 0, DateTime.UtcNow);
+        statusMessage = $"Message {id} re-queued for delivery";
+        await RefreshAsync();
+    }
+
+    private async Task DeleteAsync(long id)
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        await queue.DeleteAsync(id);
+        statusMessage = $"Message {id} deleted";
+        await RefreshAsync();
+    }
+
+    private static string FormatSize(int bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        _ => $"{bytes / (1024.0 * 1024):F1} MB"
+    };
+}

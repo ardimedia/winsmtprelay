@@ -7,6 +7,7 @@ namespace WinSmtpRelay.SmtpListener.Tests;
 public class IpNetworkHelperTests
 {
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("192.168.1.100", "192.168.0.0/16", true)]
     [DataRow("192.168.1.1", "192.168.1.0/24", true)]
     [DataRow("192.168.2.1", "192.168.1.0/24", false)]
@@ -26,6 +27,7 @@ public class IpNetworkHelperTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void IsInAnyNetwork_ReturnsTrueWhenMatchFound()
     {
         var address = IPAddress.Parse("192.168.1.50");
@@ -34,6 +36,7 @@ public class IpNetworkHelperTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void IsInAnyNetwork_ReturnsFalseWhenNoMatch()
     {
         var address = IPAddress.Parse("8.8.8.8");
@@ -42,6 +45,7 @@ public class IpNetworkHelperTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void IsInNetwork_HandlesIpv4MappedToIpv6()
     {
         var address = IPAddress.Parse("192.168.1.1").MapToIPv6();
@@ -49,6 +53,7 @@ public class IpNetworkHelperTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void IsInNetwork_HandlesCidrWithoutPrefix()
     {
         var address = IPAddress.Parse("10.0.0.1");

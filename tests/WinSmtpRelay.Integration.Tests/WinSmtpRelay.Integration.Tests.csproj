@@ -15,10 +15,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\WinSmtpRelay.Core\WinSmtpRelay.Core.csproj" />
     <ProjectReference Include="..\..\src\WinSmtpRelay.Storage\WinSmtpRelay.Storage.csproj" />
     <ProjectReference Include="..\..\src\WinSmtpRelay.SmtpListener\WinSmtpRelay.SmtpListener.csproj" />
     <ProjectReference Include="..\..\src\WinSmtpRelay.Delivery\WinSmtpRelay.Delivery.csproj" />
+    <ProjectReference Include="..\..\src\WinSmtpRelay.AdminApi\WinSmtpRelay.AdminApi.csproj" />
   </ItemGroup>
 
 </Project>

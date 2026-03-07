@@ -1,0 +1,92 @@
+@page "/config"
+@using Microsoft.Extensions.Options
+@using WinSmtpRelay.Core.Configuration
+@inject IOptions<SmtpListenerOptions> SmtpOptions
+@inject IOptions<DeliveryOptions> DeliveryOpts
+@inject IOptions<TlsOptions> TlsOpts
+@inject IOptions<DkimOptions> DkimOpts
+@inject IOptions<AdminUiOptions> AdminOpts
+
+<h1>Configuration</h1>
+<p class="text-muted mb-1">Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
+
+<div class="card mb-1">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">SMTP Listener</h3>
+    <table>
+        <thead>
+            <tr><th>Address</th><th>Port</th><th>TLS</th><th>Implicit TLS</th><th>Auth Required</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var ep in SmtpOptions.Value.Endpoints)
+            {
+                <tr>
+                    <td class="mono">@ep.Address</td>
+                    <td class="mono">@ep.Port</td>
+                    <td>@ep.RequireTls</td>
+                    <td>@ep.ImplicitTls</td>
+                    <td>@ep.RequireAuth</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <div class="mt-1">
+        <span class="text-muted">Max message size:</span> @(SmtpOptions.Value.MaxMessageSizeBytes / 1024 / 1024) MB |
+        <span class="text-muted">Max connections:</span> @SmtpOptions.Value.MaxConnections |
+        <span class="text-muted">Allowed networks:</span> @string.Join(", ", SmtpOptions.Value.AllowedNetworks)
+    </div>
+</div>
+
+<div class="card mb-1">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Delivery</h3>
+    <div>
+        <span class="text-muted">Concurrent deliveries:</span> @DeliveryOpts.Value.MaxConcurrentDeliveries |
+        <span class="text-muted">Max retry:</span> @DeliveryOpts.Value.MaxRetryHours h |
+        <span class="text-muted">Opportunistic TLS:</span> @DeliveryOpts.Value.OpportunisticTls
+    </div>
+    @if (!string.IsNullOrWhiteSpace(DeliveryOpts.Value.SmartHost))
+    {
+        <div class="mt-1">
+            <span class="text-muted">Smart host:</span> @DeliveryOpts.Value.SmartHost:@DeliveryOpts.Value.SmartHostPort
+        </div>
+    }
+    <div class="mt-1 text-muted" style="font-size:0.8rem">
+        Retry intervals: @string.Join(", ", DeliveryOpts.Value.RetryIntervalsMinutes.Select(m => $"{m}m"))
+    </div>
+</div>
+
+<div class="card mb-1">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">TLS</h3>
+    @if (!string.IsNullOrWhiteSpace(TlsOpts.Value.CertificatePath))
+    {
+        <div><span class="text-muted">Certificate:</span> PFX file configured</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(TlsOpts.Value.CertificateThumbprint))
+    {
+        <div><span class="text-muted">Certificate:</span> Store thumbprint @TlsOpts.Value.CertificateThumbprint[..8]...</div>
+    }
+    else
+    {
+        <div class="text-muted">No TLS certificate configured</div>
+    }
+</div>
+
+<div class="card mb-1">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">DKIM</h3>
+    <div><span class="text-muted">Enabled:</span> @DkimOpts.Value.Enabled</div>
+    @if (DkimOpts.Value.Enabled && DkimOpts.Value.Domains.Count > 0)
+    {
+        <div class="mt-1">
+            @foreach (var d in DkimOpts.Value.Domains)
+            {
+                <div>@d.Domain (selector: @d.Selector)</div>
+            }
+        </div>
+    }
+</div>
+
+<div class="card">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Admin UI</h3>
+    <div>
+        <span class="text-muted">Bind:</span> @AdminOpts.Value.BindAddress:@AdminOpts.Value.Port
+    </div>
+</div>

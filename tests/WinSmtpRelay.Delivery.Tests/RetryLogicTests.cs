@@ -13,6 +13,7 @@ public class RetryLogicTests
     };
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_FirstRetry_ReturnsInOneMinute()
     {
         var before = DateTime.UtcNow;
@@ -24,6 +25,7 @@ public class RetryLogicTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_SecondRetry_ReturnsInFiveMinutes()
     {
         var before = DateTime.UtcNow;
@@ -34,6 +36,7 @@ public class RetryLogicTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_ZeroRetry_ReturnsNow()
     {
         var before = DateTime.UtcNow;
@@ -45,6 +48,7 @@ public class RetryLogicTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_ExceedsMaxRetryHours_ReturnsNull()
     {
         // Total of all intervals: 1+5+30+120+480+1440 = 2076 minutes = 34.6 hours
@@ -61,6 +65,7 @@ public class RetryLogicTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_EmptyIntervals_ReturnsNull()
     {
         var config = new DeliveryOptions { RetryIntervalsMinutes = [] };
@@ -69,6 +74,7 @@ public class RetryLogicTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void CalculateNextRetry_BeyondIntervalArray_UsesLastInterval()
     {
         var config = new DeliveryOptions

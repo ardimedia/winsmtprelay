@@ -31,6 +31,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task EnqueueAsync_ReturnsId()
     {
         var message = CreateMessage();
@@ -39,6 +40,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetPendingAsync_ReturnsQueuedMessages()
     {
         var msg = CreateMessage();
@@ -50,6 +52,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetPendingAsync_SkipsFutureRetries()
     {
         var msg = CreateMessage();
@@ -61,6 +64,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task UpdateStatusAsync_SetsDelivered()
     {
         var msg = CreateMessage();
@@ -78,6 +82,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SetRetryAsync_UpdatesRetryCountAndNextRetry()
     {
         var msg = CreateMessage();
@@ -96,6 +101,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetQueueDepthAsync_CountsOnlyQueued()
     {
         var msg1 = CreateMessage();
@@ -109,6 +115,7 @@ public class MessageQueueStorageTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DeleteAsync_RemovesMessage()
     {
         var msg = CreateMessage();

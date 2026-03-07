@@ -6,6 +6,7 @@ namespace WinSmtpRelay.Core.Tests;
 public class MessageQueueTests
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public void QueuedMessage_DefaultStatus_IsQueued()
     {
         var message = new QueuedMessage
@@ -22,6 +23,7 @@ public class MessageQueueTests
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void QueuedMessage_CreatedUtc_IsSetAutomatically()
     {
         var before = DateTime.UtcNow;
