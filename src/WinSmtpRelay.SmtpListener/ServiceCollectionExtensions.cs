@@ -12,6 +12,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RelayMessageStore>();
         services.AddSingleton<RelayMailboxFilter>();
         services.AddSingleton<IUserAuthenticator, RelayUserAuthenticator>();
+        services.AddSingleton<SpfValidator>();
+        services.AddSingleton<DmarcValidator>();
+        services.AddSingleton<EmailAuthenticationService>();
+        services.AddSingleton<RateLimiter>();
         services.AddHostedService<SmtpRelayServer>();
 
         return services;

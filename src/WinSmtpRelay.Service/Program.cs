@@ -18,6 +18,7 @@ builder.Services.Configure<DeliveryOptions>(builder.Configuration.GetSection(Del
 builder.Services.Configure<TlsOptions>(builder.Configuration.GetSection(TlsOptions.SectionName));
 builder.Services.Configure<DkimOptions>(builder.Configuration.GetSection(DkimOptions.SectionName));
 builder.Services.Configure<AdminUiOptions>(builder.Configuration.GetSection(AdminUiOptions.SectionName));
+builder.Services.Configure<EmailAuthenticationOptions>(builder.Configuration.GetSection(EmailAuthenticationOptions.SectionName));
 
 // Storage
 var connectionString = builder.Configuration.GetConnectionString("RelayDb") ?? "Data Source=winsmtprelay.db";
@@ -40,6 +41,10 @@ if (adminUiConfig.Enabled)
 
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
+
+    builder.Services.AddSignalR();
+    builder.Services.AddHttpClient();
+    builder.Services.AddHostedService<WinSmtpRelay.Service.TrayIconService>();
 }
 
 var app = builder.Build();
@@ -53,11 +58,16 @@ using (var scope = app.Services.CreateScope())
 
 if (adminUiConfig.Enabled)
 {
-    app.UseStaticFiles();
     app.UseAntiforgery();
 
     // Admin REST API
     app.MapAdminApi();
+
+    // SignalR hub for live activity
+    app.MapHub<ActivityHub>("/hubs/activity");
+
+    // Static assets (serves _framework/blazor.web.js etc.)
+    app.MapStaticAssets();
 
     // Blazor Admin UI
     app.MapRazorComponents<WinSmtpRelay.AdminUi.Components.App>()

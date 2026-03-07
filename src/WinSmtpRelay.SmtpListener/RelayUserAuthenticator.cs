@@ -30,6 +30,7 @@ public class RelayUserAuthenticator : UserAuthenticator, IUserAuthenticator
 
         if (result)
         {
+            context.Properties["AuthenticatedUser"] = user;
             _logger.LogInformation("SMTP AUTH successful for user {User}", user);
         }
         else

@@ -8,10 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DnsClient" Version="1.*" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.*" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.*" />
     <PackageReference Include="MimeKit" Version="4.*" />
-    <PackageReference Include="Nager.EmailAuthentication" Version="0.*" />
+    <PackageReference Include="Nager.EmailAuthentication" Version="1.*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using WinSmtpRelay.Core.Interfaces;
 using WinSmtpRelay.Core.Models;
+using WinSmtpRelay.Storage;
 
 namespace WinSmtpRelay.AdminApi;
 
@@ -14,6 +16,7 @@ public static class AdminEndpoints
 
         MapHealthEndpoints(group);
         MapQueueEndpoints(group);
+        MapDeliveryLogEndpoints(group);
         MapUserEndpoints(group);
         MapServerEndpoints(group);
 
@@ -104,6 +107,36 @@ public static class AdminEndpoints
         });
     }
 
+    private static void MapDeliveryLogEndpoints(RouteGroupBuilder group)
+    {
+        var logs = group.MapGroup("/deliverylogs");
+
+        logs.MapGet("/", async (RelayDbContext db, CancellationToken ct,
+            long? messageId = null, int limit = 50, int offset = 0) =>
+        {
+            var query = db.DeliveryLogs.AsNoTracking().AsQueryable();
+            if (messageId.HasValue)
+                query = query.Where(l => l.QueuedMessageId == messageId.Value);
+
+            var items = await query
+                .OrderByDescending(l => l.TimestampUtc)
+                .Skip(offset)
+                .Take(limit)
+                .Select(l => new DeliveryLogSummary(
+                    l.Id, l.QueuedMessageId, l.Recipient, l.StatusCode,
+                    l.StatusMessage, l.RemoteServer, l.TimestampUtc))
+                .ToListAsync(ct);
+
+            return Results.Ok(items);
+        });
+
+        logs.MapGet("/count", async (RelayDbContext db, CancellationToken ct) =>
+        {
+            var count = await db.DeliveryLogs.CountAsync(ct);
+            return Results.Ok(new { Count = count });
+        });
+    }
+
     private static void MapServerEndpoints(RouteGroupBuilder group)
     {
         group.MapGet("/server/info", () =>
@@ -134,3 +167,7 @@ public record UserSummary(
     int? RateLimitPerMinute, int? RateLimitPerDay, DateTime CreatedUtc);
 
 public record CreateUserRequest(string Username, string Password);
+
+public record DeliveryLogSummary(
+    long Id, long QueuedMessageId, string Recipient, string StatusCode,
+    string StatusMessage, string? RemoteServer, DateTime TimestampUtc);

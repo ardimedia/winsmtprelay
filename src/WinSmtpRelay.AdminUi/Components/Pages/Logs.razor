@@ -1,0 +1,120 @@
+@page "/logs"
+@using System.Diagnostics
+@using System.Diagnostics.Eventing.Reader
+
+<h2>Log Viewer</h2>
+<p class="text-muted">Windows Event Log entries for WinSmtpRelay</p>
+
+<div class="search-bar">
+    <select @bind="selectedLevel">
+        <option value="">All Levels</option>
+        <option value="Information">Information</option>
+        <option value="Warning">Warning</option>
+        <option value="Error">Error</option>
+    </select>
+    <input type="number" @bind="maxEntries" style="width:80px;" title="Max entries" />
+    <button class="btn" @onclick="LoadLogs">Refresh</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Level</th>
+            <th>Source</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (logEntries.Count == 0)
+        {
+            <tr><td colspan="4" style="text-align:center;">No log entries found. The Windows Event Log source 'WinSmtpRelay' may not be registered.</td></tr>
+        }
+        @foreach (var entry in logEntries)
+        {
+            <tr class="@GetRowClass(entry.Level)">
+                <td style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td><span class="badge @GetBadgeClass(entry.Level)">@entry.Level</span></td>
+                <td>@entry.Source</td>
+                <td>@Truncate(entry.Message, 120)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<LogEntry> logEntries = [];
+    private string selectedLevel = "";
+    private int maxEntries = 100;
+
+    protected override void OnInitialized()
+    {
+        LoadLogs();
+    }
+
+    private void LoadLogs()
+    {
+        logEntries.Clear();
+
+        try
+        {
+            if (!OperatingSystem.IsWindows()) return;
+
+            var query = "*[System[Provider[@Name='WinSmtpRelay'] or Provider[@Name='.NET Runtime']]]";
+            using var logReader = new EventLogReader(new EventLogQuery("Application", PathType.LogName, query));
+
+            var entries = new List<LogEntry>();
+            EventRecord? record;
+            while ((record = logReader.ReadEvent()) is not null)
+            {
+                using (record)
+                {
+                    var level = record.Level switch
+                    {
+                        (byte)StandardEventLevel.Error or (byte)StandardEventLevel.Critical => "Error",
+                        (byte)StandardEventLevel.Warning => "Warning",
+                        _ => "Information"
+                    };
+
+                    if (!string.IsNullOrEmpty(selectedLevel) && level != selectedLevel)
+                        continue;
+
+                    entries.Add(new LogEntry(
+                        record.TimeCreated ?? DateTime.MinValue,
+                        level,
+                        record.ProviderName ?? "Unknown",
+                        record.FormatDescription() ?? "(no message)"));
+                }
+            }
+
+            logEntries = entries
+                .OrderByDescending(e => e.Time)
+                .Take(maxEntries)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            logEntries.Add(new LogEntry(DateTime.Now, "Error", "LogViewer",
+                $"Failed to read Event Log: {ex.Message}"));
+        }
+    }
+
+    private static string GetRowClass(string level) => level switch
+    {
+        "Error" => "row-error",
+        "Warning" => "row-warning",
+        _ => ""
+    };
+
+    private static string GetBadgeClass(string level) => level switch
+    {
+        "Error" => "badge-danger",
+        "Warning" => "badge-warning",
+        _ => "badge-success"
+    };
+
+    private static string Truncate(string text, int maxLen) =>
+        text.Length > maxLen ? text[..maxLen] + "..." : text;
+
+    private record LogEntry(DateTime Time, string Level, string Source, string Message);
+}

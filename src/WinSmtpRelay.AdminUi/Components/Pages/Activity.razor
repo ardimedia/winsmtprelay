@@ -1,0 +1,93 @@
+@page "/activity"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<h2>Live Activity</h2>
+<p class="text-muted">Real-time feed of SMTP connections, messages, and deliveries</p>
+
+<div style="margin-bottom:1rem;">
+    <span class="badge @(isConnected ? "badge-success" : "badge-danger")">
+        @(isConnected ? "Connected" : "Disconnected")
+    </span>
+    <button class="btn btn-sm" @onclick="ClearFeed" style="margin-left:1rem;">Clear</button>
+</div>
+
+<div class="activity-feed">
+    @if (events.Count == 0)
+    {
+        <p style="text-align:center;color:var(--text-muted);">Waiting for activity...</p>
+    }
+    @foreach (var evt in events)
+    {
+        <div class="activity-item @evt.CssClass">
+            <span class="activity-time">@evt.Timestamp.ToString("HH:mm:ss")</span>
+            <span class="activity-icon">@evt.Icon</span>
+            <span class="activity-text">@evt.Text</span>
+        </div>
+    }
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private bool isConnected;
+    private readonly List<ActivityEvent> events = [];
+    private const int MaxEvents = 200;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var hubUrl = Navigation.ToAbsoluteUri("/hubs/activity");
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<dynamic>("MessageReceived", (data) =>
+        {
+            AddEvent(">>>", $"Message received from {data.GetProperty("sender")} to {data.GetProperty("recipients")} ({data.GetProperty("sizeBytes")} bytes)", "activity-received");
+        });
+
+        hubConnection.On<dynamic>("DeliveryAttempt", (data) =>
+        {
+            var status = data.GetProperty("statusCode").ToString();
+            var cssClass = status == "250" ? "activity-delivered" : "activity-error";
+            AddEvent("<<<", $"Delivery to {data.GetProperty("recipient")}: {status} via {data.GetProperty("remoteServer")}", cssClass);
+        });
+
+        hubConnection.On<dynamic>("SmtpConnection", (data) =>
+        {
+            AddEvent("...", $"SMTP {data.GetProperty("eventType")} from {data.GetProperty("sourceIp")}", "activity-connection");
+        });
+
+        hubConnection.Closed += _ => { isConnected = false; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        hubConnection.Reconnected += _ => { isConnected = true; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+
+        try
+        {
+            await hubConnection.StartAsync();
+            isConnected = true;
+        }
+        catch
+        {
+            isConnected = false;
+        }
+    }
+
+    private void AddEvent(string icon, string text, string cssClass)
+    {
+        events.Insert(0, new ActivityEvent(DateTime.Now, icon, text, cssClass));
+        if (events.Count > MaxEvents)
+            events.RemoveAt(events.Count - 1);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ClearFeed() => events.Clear();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
+
+    private record ActivityEvent(DateTime Timestamp, string Icon, string Text, string CssClass);
+}

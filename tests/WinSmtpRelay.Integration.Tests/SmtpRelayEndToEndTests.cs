@@ -1,3 +1,4 @@
+using DnsClient;
 using MailKit.Net.Smtp;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,6 +46,8 @@ public class SmtpRelayEndToEndTests
             });
 
             builder.Services.AddRelayStorage($"Data Source={dbPath}");
+            builder.Services.AddSingleton<ILookupClient>(new LookupClient());
+            builder.Services.Configure<EmailAuthenticationOptions>(_ => { });
             builder.Services.AddSmtpListener();
             // Don't add DeliveryWorker — we only want to test queuing
             builder.Logging.SetMinimumLevel(LogLevel.Debug);

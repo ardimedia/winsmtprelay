@@ -1,0 +1,115 @@
+@page "/journal"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.DependencyInjection
+@using WinSmtpRelay.Core.Models
+@using WinSmtpRelay.Storage
+@inject IServiceScopeFactory ScopeFactory
+
+<h2>Message Journal</h2>
+<p class="text-muted">Per-message delivery audit trail</p>
+
+<div class="search-bar">
+    <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Search by recipient, message ID, or status..." />
+    <button class="btn" @onclick="LoadLogs">Search</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Time (UTC)</th>
+            <th>Msg ID</th>
+            <th>Recipient</th>
+            <th>Status</th>
+            <th>Remote Server</th>
+            <th>Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (logs.Count == 0)
+        {
+            <tr><td colspan="6" style="text-align:center;">No delivery log entries found.</td></tr>
+        }
+        @foreach (var log in logs)
+        {
+            <tr>
+                <td>@log.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td title="Queue ID: @log.QueuedMessageId">@log.QueuedMessageId</td>
+                <td>@log.Recipient</td>
+                <td>
+                    <span class="badge @GetStatusClass(log.StatusCode)">@log.StatusCode</span>
+                </td>
+                <td>@(log.RemoteServer ?? "-")</td>
+                <td title="@log.StatusMessage">@Truncate(log.StatusMessage, 60)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (logs.Count >= pageSize)
+{
+    <div style="margin-top:1rem;text-align:center;">
+        <button class="btn" @onclick="LoadMore">Load More</button>
+    </div>
+}
+
+@code {
+    private List<DeliveryLog> logs = [];
+    private string searchTerm = "";
+    private int pageSize = 50;
+    private int offset = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        offset = 0;
+        logs.Clear();
+        await FetchLogs();
+    }
+
+    private async Task LoadMore()
+    {
+        offset += pageSize;
+        await FetchLogs();
+    }
+
+    private async Task FetchLogs()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+
+        var query = db.DeliveryLogs.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.Trim();
+            query = query.Where(l =>
+                l.Recipient.Contains(term) ||
+                l.StatusCode.Contains(term) ||
+                l.StatusMessage.Contains(term) ||
+                (l.RemoteServer != null && l.RemoteServer.Contains(term)));
+        }
+
+        var batch = await query
+            .OrderByDescending(l => l.TimestampUtc)
+            .Skip(offset)
+            .Take(pageSize)
+            .ToListAsync();
+
+        logs.AddRange(batch);
+    }
+
+    private static string GetStatusClass(string statusCode) => statusCode switch
+    {
+        "250" => "badge-success",
+        _ when statusCode.StartsWith("4") => "badge-warning",
+        _ when statusCode.StartsWith("5") => "badge-danger",
+        _ => ""
+    };
+
+    private static string Truncate(string text, int maxLen) =>
+        text.Length > maxLen ? text[..maxLen] + "..." : text;
+}

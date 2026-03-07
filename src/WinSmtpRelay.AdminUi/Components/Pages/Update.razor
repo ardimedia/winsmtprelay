@@ -1,0 +1,140 @@
+@page "/update"
+@using System.Text.Json
+@inject IHttpClientFactory HttpClientFactory
+
+<h2>Software Update</h2>
+<p class="text-muted">Check for new WinSmtpRelay releases on GitHub</p>
+
+<div class="card" style="margin-bottom:1rem;">
+    <h3>Current Version</h3>
+    <p><strong>@currentVersion</strong></p>
+</div>
+
+<div class="card">
+    <h3>Latest Release</h3>
+
+    @if (isChecking)
+    {
+        <p>Checking for updates...</p>
+    }
+    else if (errorMessage is not null)
+    {
+        <p class="text-danger">@errorMessage</p>
+        <button class="btn" @onclick="CheckForUpdates">Retry</button>
+    }
+    else if (latestRelease is not null)
+    {
+        <p>
+            <strong>@latestRelease.TagName</strong>
+            @if (isNewer)
+            {
+                <span class="badge badge-warning" style="margin-left:0.5rem;">Update Available</span>
+            }
+            else
+            {
+                <span class="badge badge-success" style="margin-left:0.5rem;">Up to date</span>
+            }
+        </p>
+        <p>@latestRelease.Name</p>
+        <p class="text-muted">Published: @latestRelease.PublishedAt?.ToString("yyyy-MM-dd HH:mm")</p>
+
+        @if (latestRelease.Assets.Count > 0)
+        {
+            <h4>Downloads</h4>
+            <ul>
+                @foreach (var asset in latestRelease.Assets)
+                {
+                    <li>
+                        <a href="@asset.DownloadUrl" target="_blank">@asset.Name</a>
+                        <span class="text-muted">(@FormatSize(asset.Size))</span>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (!string.IsNullOrEmpty(latestRelease.Body))
+        {
+            <h4>Release Notes</h4>
+            <pre style="white-space:pre-wrap;font-size:0.85rem;max-height:300px;overflow-y:auto;">@latestRelease.Body</pre>
+        }
+    }
+    else
+    {
+        <button class="btn" @onclick="CheckForUpdates">Check for Updates</button>
+    }
+</div>
+
+@code {
+    private string currentVersion = typeof(Update).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+    private bool isChecking;
+    private string? errorMessage;
+    private GitHubRelease? latestRelease;
+    private bool isNewer;
+
+    private async Task CheckForUpdates()
+    {
+        isChecking = true;
+        errorMessage = null;
+        latestRelease = null;
+        StateHasChanged();
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "WinSmtpRelay-Admin");
+            client.Timeout = TimeSpan.FromSeconds(15);
+
+            var response = await client.GetAsync("https://api.github.com/repos/ardimedia/winsmtprelay/releases/latest");
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"GitHub API returned {response.StatusCode}. No releases published yet?";
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            latestRelease = JsonSerializer.Deserialize<GitHubRelease>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            if (latestRelease is not null)
+            {
+                var latestVer = latestRelease.TagName?.TrimStart('v') ?? "0.0.0";
+                isNewer = string.Compare(latestVer, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to check: {ex.Message}";
+        }
+        finally
+        {
+            isChecking = false;
+        }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1_048_576 => $"{bytes / 1_048_576.0:F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
+
+    private class GitHubRelease
+    {
+        public string? TagName { get; set; }
+        public string? Name { get; set; }
+        public string? Body { get; set; }
+        public DateTime? PublishedAt { get; set; }
+        public bool Prerelease { get; set; }
+        public List<GitHubAsset> Assets { get; set; } = [];
+    }
+
+    private class GitHubAsset
+    {
+        public string Name { get; set; } = "";
+        public string BrowserDownloadUrl { get; set; } = "";
+        public string DownloadUrl => BrowserDownloadUrl;
+        public long Size { get; set; }
+    }
+}

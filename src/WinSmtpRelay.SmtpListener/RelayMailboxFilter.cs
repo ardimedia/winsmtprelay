@@ -1,25 +1,39 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmtpServer;
 using SmtpServer.Mail;
 using SmtpServer.Storage;
 using WinSmtpRelay.Core.Configuration;
+using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Security;
 
 namespace WinSmtpRelay.SmtpListener;
 
 public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
 {
     private readonly SmtpListenerOptions _options;
+    private readonly EmailAuthenticationService _emailAuth;
+    private readonly RateLimiter _rateLimiter;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RelayMailboxFilter> _logger;
 
-    public RelayMailboxFilter(IOptions<SmtpListenerOptions> options, ILogger<RelayMailboxFilter> logger)
+    public RelayMailboxFilter(
+        IOptions<SmtpListenerOptions> options,
+        EmailAuthenticationService emailAuth,
+        RateLimiter rateLimiter,
+        IServiceScopeFactory scopeFactory,
+        ILogger<RelayMailboxFilter> logger)
     {
         _options = options.Value;
+        _emailAuth = emailAuth;
+        _rateLimiter = rateLimiter;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
-    public override Task<bool> CanAcceptFromAsync(
+    public override async Task<bool> CanAcceptFromAsync(
         ISessionContext context,
         IMailbox from,
         int size,
@@ -30,22 +44,63 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         {
             _logger.LogWarning("Message from {Sender} rejected: size {Size} exceeds limit {Limit}",
                 from.AsAddress(), size, _options.MaxMessageSizeBytes);
-            return Task.FromResult(false);
+            return false;
         }
 
+        var remoteEndPoint = context.Properties.TryGetValue("RemoteEndPoint", out var ep) ? ep as IPEndPoint : null;
+
         // Check IP-based relay restrictions
-        if (context.Properties.TryGetValue("RemoteEndPoint", out var ep) && ep is IPEndPoint remoteEndPoint)
+        if (remoteEndPoint is not null &&
+            _options.AllowedNetworks.Count > 0 &&
+            !IpNetworkHelper.IsInAnyNetwork(remoteEndPoint.Address, _options.AllowedNetworks))
         {
-            if (_options.AllowedNetworks.Count > 0 &&
-                !IpNetworkHelper.IsInAnyNetwork(remoteEndPoint.Address, _options.AllowedNetworks))
+            _logger.LogWarning("Relay denied for {ClientIp}: not in allowed networks", remoteEndPoint.Address);
+            return false;
+        }
+
+        // Per-user SendAs enforcement
+        var authenticatedUser = GetAuthenticatedUser(context);
+        if (authenticatedUser is not null)
+        {
+            var senderAddress = from.AsAddress();
+
+            // Check SendAs
+            if (!await IsAllowedSenderAsync(authenticatedUser, senderAddress, cancellationToken))
             {
-                _logger.LogWarning("Relay denied for {ClientIp}: not in allowed networks",
-                    remoteEndPoint.Address);
-                return Task.FromResult(false);
+                _logger.LogWarning("User {User} not allowed to send as {Sender}", authenticatedUser, senderAddress);
+                return false;
+            }
+
+            // Check rate limit
+            var user = await GetUserAsync(authenticatedUser, cancellationToken);
+            if (user is not null && !_rateLimiter.IsAllowed(authenticatedUser, user.RateLimitPerMinute, user.RateLimitPerDay))
+            {
+                _logger.LogWarning("Rate limit exceeded for user {User}", authenticatedUser);
+                return false;
             }
         }
 
-        return Task.FromResult(true);
+        // SPF check (store result in context for later use in SaveAsync)
+        if (remoteEndPoint is not null)
+        {
+            var senderDomain = GetDomainFromAddress(from.AsAddress());
+            var spfResult = await _emailAuth.CheckSpfAsync(remoteEndPoint.Address, senderDomain, cancellationToken);
+            context.Properties["SpfResult"] = spfResult;
+            context.Properties["EnvelopeFromDomain"] = senderDomain;
+
+            // In Reject mode, reject on SPF hard fail
+            if (spfResult.Verdict == Security.Models.SpfVerdict.Fail &&
+                _emailAuth.ShouldReject(new Security.Models.AuthenticationResults(
+                    spfResult, new Security.Models.DmarcCheckResult(
+                        Security.Models.DmarcVerdict.None, Security.Models.DmarcPolicy.None, ""))))
+            {
+                _logger.LogWarning("Message from {Sender} rejected: SPF fail from {Ip}",
+                    from.AsAddress(), remoteEndPoint.Address);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public override Task<bool> CanDeliverToAsync(
@@ -70,5 +125,35 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         }
 
         return Task.FromResult(true);
+    }
+
+    private static string? GetAuthenticatedUser(ISessionContext context)
+    {
+        return context.Properties.TryGetValue("AuthenticatedUser", out var user)
+            ? user as string
+            : null;
+    }
+
+    private async Task<bool> IsAllowedSenderAsync(string username, string senderAddress, CancellationToken cancellationToken)
+    {
+        var user = await GetUserAsync(username, cancellationToken);
+        if (user?.AllowedSenderAddresses is null or "")
+            return true; // no restriction
+
+        var allowed = user.AllowedSenderAddresses.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return allowed.Any(a => string.Equals(a, senderAddress, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task<Core.Models.RelayUser?> GetUserAsync(string username, CancellationToken cancellationToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+        return await userService.GetByUsernameAsync(username, cancellationToken);
+    }
+
+    private static string GetDomainFromAddress(string emailAddress)
+    {
+        var atIndex = emailAddress.LastIndexOf('@');
+        return atIndex >= 0 ? emailAddress[(atIndex + 1)..] : emailAddress;
     }
 }
