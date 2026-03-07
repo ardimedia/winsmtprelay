@@ -16,6 +16,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<DmarcValidator>();
         services.AddSingleton<EmailAuthenticationService>();
         services.AddSingleton<RateLimiter>();
+        services.AddSingleton<WebhookService>();
+        services.AddHttpClient("Webhook");
         services.AddHostedService<SmtpRelayServer>();
         services.AddHostedService<PickupFolderService>();
 

@@ -14,6 +14,7 @@ namespace WinSmtpRelay.SmtpListener;
 public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
 {
     private readonly SmtpListenerOptions _options;
+    private readonly BackupMxOptions _backupMxOptions;
     private readonly EmailAuthenticationService _emailAuth;
     private readonly RateLimiter _rateLimiter;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -21,12 +22,14 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
 
     public RelayMailboxFilter(
         IOptions<SmtpListenerOptions> options,
+        IOptions<BackupMxOptions> backupMxOptions,
         EmailAuthenticationService emailAuth,
         RateLimiter rateLimiter,
         IServiceScopeFactory scopeFactory,
         ILogger<RelayMailboxFilter> logger)
     {
         _options = options.Value;
+        _backupMxOptions = backupMxOptions.Value;
         _emailAuth = emailAuth;
         _rateLimiter = rateLimiter;
         _scopeFactory = scopeFactory;
@@ -48,6 +51,20 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         }
 
         var remoteEndPoint = context.Properties.TryGetValue("RemoteEndPoint", out var ep) ? ep as IPEndPoint : null;
+        var clientIp = remoteEndPoint?.Address.ToString();
+
+        // Check if IP is auto-banned (failed auth)
+        if (clientIp is not null && _rateLimiter.IsIpBanned(clientIp))
+        {
+            _logger.LogWarning("Connection from {ClientIp} rejected: IP is auto-banned", clientIp);
+            return false;
+        }
+
+        // Check per-IP rate limit
+        if (clientIp is not null && !_rateLimiter.IsIpAllowed(clientIp))
+        {
+            return false;
+        }
 
         // Check IP-based relay restrictions
         if (remoteEndPoint is not null &&
@@ -55,6 +72,12 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
             !IpNetworkHelper.IsInAnyNetwork(remoteEndPoint.Address, _options.AllowedNetworks))
         {
             _logger.LogWarning("Relay denied for {ClientIp}: not in allowed networks", remoteEndPoint.Address);
+            return false;
+        }
+
+        // Check per-sender rate limit
+        if (!_rateLimiter.IsSenderAllowed(from.AsAddress()))
+        {
             return false;
         }
 
@@ -109,10 +132,18 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         IMailbox from,
         CancellationToken cancellationToken)
     {
+        var recipientDomain = to.Host;
+
+        // Always accept mail for backup MX domains
+        if (_backupMxOptions.Enabled &&
+            _backupMxOptions.Domains.Any(d => string.Equals(d, recipientDomain, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Task.FromResult(true);
+        }
+
         // If accepted domains are configured, check recipient domain
         if (_options.AcceptedDomains.Count > 0)
         {
-            var recipientDomain = to.Host;
             var accepted = _options.AcceptedDomains.Any(d =>
                 string.Equals(d, recipientDomain, StringComparison.OrdinalIgnoreCase));
 

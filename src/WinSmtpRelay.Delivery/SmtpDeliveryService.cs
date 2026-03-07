@@ -57,7 +57,19 @@ public class SmtpDeliveryService : IDeliveryService
         string domain,
         CancellationToken cancellationToken)
     {
-        // Smart host takes priority if configured
+        // 1. Per-domain route takes highest priority
+        var route = FindDomainRoute(domain);
+        if (route != null)
+        {
+            _logger.LogDebug("Using domain route {Pattern} for domain {Domain}", route.DomainPattern, domain);
+            await SendViaSmtpAsync(
+                mimeMessage, sender, recipients,
+                route.Host, route.Port, route.Username, route.Password,
+                cancellationToken);
+            return;
+        }
+
+        // 2. Global smart host
         if (!string.IsNullOrWhiteSpace(_config.SmartHost))
         {
             await SendViaSmtpAsync(
@@ -68,7 +80,7 @@ public class SmtpDeliveryService : IDeliveryService
             return;
         }
 
-        // Direct MX delivery
+        // 3. Direct MX delivery
         var mxHosts = await _mxResolver.ResolveMxAsync(domain, cancellationToken);
 
         Exception? lastException = null;
@@ -89,6 +101,28 @@ public class SmtpDeliveryService : IDeliveryService
 
         throw new InvalidOperationException(
             $"All MX hosts exhausted for domain {domain}", lastException);
+    }
+
+    internal DomainRouteOptions? FindDomainRoute(string domain)
+    {
+        foreach (var route in _config.DomainRoutes)
+        {
+            var pattern = route.DomainPattern;
+            if (string.IsNullOrWhiteSpace(pattern)) continue;
+
+            if (pattern.StartsWith("*."))
+            {
+                var suffix = pattern[1..]; // ".example.com"
+                if (domain.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
+                    domain.Equals(pattern[2..], StringComparison.OrdinalIgnoreCase))
+                    return route;
+            }
+            else if (domain.Equals(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                return route;
+            }
+        }
+        return null;
     }
 
     private async Task SendViaSmtpAsync(

@@ -11,6 +11,7 @@ namespace WinSmtpRelay.Delivery;
 public class DeliveryWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<DeliveryOptions> options,
+    IOptions<BackupMxOptions> backupMxOptions,
     ILogger<DeliveryWorker> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
@@ -79,6 +80,34 @@ public class DeliveryWorker(
 
         try
         {
+            // Run message filters before delivery
+            var filters = scope.ServiceProvider.GetServices<IMessageFilter>().OrderBy(f => f.Order);
+            var filterContext = new MessageFilterContext
+            {
+                RawMessage = message.RawMessage,
+                Sender = message.Sender,
+                Recipients = message.Recipients,
+                SourceIp = message.SourceIp
+            };
+
+            foreach (var filter in filters)
+            {
+                var result = await filter.FilterAsync(filterContext, cancellationToken);
+                if (!result.Accept)
+                {
+                    await queue.UpdateStatusAsync(message.Id, MessageStatus.Bounced, $"Filtered: {result.RejectReason}", cancellationToken);
+                    logger.LogInformation("Message {MessageId} rejected by filter: {Reason}",
+                        message.MessageId, result.RejectReason);
+                    return;
+                }
+                if (result.ModifiedRawMessage != null)
+                {
+                    filterContext.RawMessage = result.ModifiedRawMessage;
+                    message.RawMessage = result.ModifiedRawMessage;
+                    message.Sender = filterContext.Sender;
+                }
+            }
+
             await deliveryService.DeliverAsync(message, cancellationToken);
             await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivered, cancellationToken: cancellationToken);
 
@@ -93,7 +122,19 @@ public class DeliveryWorker(
             message.RetryCount++;
             message.LastError = ex.Message;
 
-            var nextRetry = CalculateNextRetry(message.RetryCount, config);
+            // Use extended hold time for backup MX domains
+            var effectiveConfig = config;
+            var backupMx = backupMxOptions.Value;
+            if (backupMx.Enabled && IsBackupMxMessage(message, backupMx))
+            {
+                effectiveConfig = new DeliveryOptions
+                {
+                    MaxRetryHours = backupMx.MaxHoldHours,
+                    RetryIntervalsMinutes = [backupMx.RetryIntervalMinutes]
+                };
+            }
+
+            var nextRetry = CalculateNextRetry(message.RetryCount, effectiveConfig);
 
             if (nextRetry == null || IsPermanentFailure(ex))
             {
@@ -130,6 +171,16 @@ public class DeliveryWorker(
             return null;
 
         return DateTime.UtcNow.AddMinutes(delayMinutes);
+    }
+
+    private static bool IsBackupMxMessage(QueuedMessage message, BackupMxOptions backupMx)
+    {
+        var recipientDomains = message.Recipients
+            .Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(r => r.Split('@').Last());
+
+        return recipientDomains.Any(domain =>
+            backupMx.Domains.Any(d => string.Equals(d, domain, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static bool IsPermanentFailure(Exception ex)

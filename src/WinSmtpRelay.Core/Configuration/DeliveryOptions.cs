@@ -12,4 +12,17 @@ public class DeliveryOptions
     public string? SmartHostUsername { get; set; }
     public string? SmartHostPassword { get; set; }
     public bool OpportunisticTls { get; set; } = true;
+
+    /// Per-domain routing: domain pattern to upstream relay config.
+    /// Checked before global SmartHost. Supports wildcard prefix (e.g. "*.example.com").
+    public List<DomainRouteOptions> DomainRoutes { get; set; } = [];
+}
+
+public class DomainRouteOptions
+{
+    public string DomainPattern { get; set; } = "";
+    public string Host { get; set; } = "";
+    public int Port { get; set; } = 587;
+    public string? Username { get; set; }
+    public string? Password { get; set; }
 }

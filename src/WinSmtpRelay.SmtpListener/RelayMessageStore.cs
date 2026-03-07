@@ -18,15 +18,18 @@ public class RelayMessageStore : MessageStore
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly EmailAuthenticationService _emailAuth;
+    private readonly WebhookService _webhookService;
     private readonly ILogger<RelayMessageStore> _logger;
 
     public RelayMessageStore(
         IServiceScopeFactory scopeFactory,
         EmailAuthenticationService emailAuth,
+        WebhookService webhookService,
         ILogger<RelayMessageStore> logger)
     {
         _scopeFactory = scopeFactory;
         _emailAuth = emailAuth;
+        _webhookService = webhookService;
         _logger = logger;
     }
 
@@ -91,6 +94,9 @@ public class RelayMessageStore : MessageStore
             "Message {MessageId} queued (id={QueueId}) from {Sender} to {Recipients} ({Size} bytes) via {SourceIp} spf={SpfVerdict}",
             messageId, id, sender, recipients, rawMessage.Length, sourceIp ?? "unknown",
             authResults.Spf.Verdict);
+
+        // Fire webhook notifications (fire-and-forget, do not block SMTP response)
+        _ = _webhookService.NotifyMessageReceivedAsync(messageId, sender, recipients, rawMessage.Length, sourceIp, CancellationToken.None);
 
         return SmtpResponse.Ok;
     }

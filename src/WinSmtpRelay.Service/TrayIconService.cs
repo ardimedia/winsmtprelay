@@ -15,6 +15,7 @@ public class TrayIconService : BackgroundService
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private System.Windows.Forms.ToolStripMenuItem? _statusItem;
     private System.Windows.Forms.ToolStripMenuItem? _queueItem;
+    private int _lastQueueDepth = -1;
 
     public TrayIconService(
         IOptions<AdminUiOptions> adminUiOptions,
@@ -54,7 +55,7 @@ public class TrayIconService : BackgroundService
             _trayIcon = new System.Windows.Forms.NotifyIcon
             {
                 Text = "WinSmtpRelay",
-                Icon = System.Drawing.SystemIcons.Application,
+                Icon = CreateStatusIcon(System.Drawing.Color.Green, null),
                 Visible = true,
                 ContextMenuStrip = CreateContextMenu()
             };
@@ -117,6 +118,17 @@ public class TrayIconService : BackgroundService
             if (_trayIcon is not null)
             {
                 _trayIcon.Text = text.Length > 63 ? text[..63] : text;
+
+                // Update icon color and badge when queue depth changes
+                if (depth != _lastQueueDepth)
+                {
+                    _lastQueueDepth = depth;
+                    var color = depth == 0 ? System.Drawing.Color.Green : System.Drawing.Color.Orange;
+                    var badge = depth > 0 ? (depth > 99 ? "99+" : depth.ToString()) : null;
+                    var oldIcon = _trayIcon.Icon;
+                    _trayIcon.Icon = CreateStatusIcon(color, badge);
+                    oldIcon?.Dispose();
+                }
             }
 
             _queueItem?.GetCurrentParent()?.Invoke((System.Windows.Forms.MethodInvoker)(() =>
@@ -127,8 +139,52 @@ public class TrayIconService : BackgroundService
         }
         catch
         {
-            // Ignore errors during status updates
+            // Update icon to red on error
+            if (_trayIcon is not null && _lastQueueDepth != -2)
+            {
+                _lastQueueDepth = -2;
+                var oldIcon = _trayIcon.Icon;
+                _trayIcon.Icon = CreateStatusIcon(System.Drawing.Color.Red, "!");
+                oldIcon?.Dispose();
+
+                _statusItem?.GetCurrentParent()?.Invoke((System.Windows.Forms.MethodInvoker)(() =>
+                {
+                    if (_statusItem is not null)
+                        _statusItem.Text = "Status: Error";
+                }));
+            }
         }
+    }
+
+    private static System.Drawing.Icon CreateStatusIcon(System.Drawing.Color color, string? badge)
+    {
+        const int size = 16;
+        using var bitmap = new System.Drawing.Bitmap(size, size);
+        using var g = System.Drawing.Graphics.FromImage(bitmap);
+
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.Clear(System.Drawing.Color.Transparent);
+
+        // Filled circle as status indicator
+        using var brush = new System.Drawing.SolidBrush(color);
+        g.FillEllipse(brush, 1, 1, size - 2, size - 2);
+
+        // Dark border
+        using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(60, 60, 60), 1f);
+        g.DrawEllipse(pen, 1, 1, size - 3, size - 3);
+
+        // Badge text overlay
+        if (badge is not null)
+        {
+            using var font = new System.Drawing.Font("Segoe UI", badge.Length > 2 ? 5f : 7f, System.Drawing.FontStyle.Bold);
+            using var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+            var textSize = g.MeasureString(badge, font);
+            g.DrawString(badge, font, textBrush,
+                (size - textSize.Width) / 2,
+                (size - textSize.Height) / 2);
+        }
+
+        return System.Drawing.Icon.FromHandle(bitmap.GetHicon());
     }
 
     private void OpenAdminUi()
