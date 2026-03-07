@@ -14,6 +14,7 @@
     </select>
     <input type="number" @bind="maxEntries" style="width:80px;" title="Max entries" />
     <button class="btn" @onclick="LoadLogs">Refresh</button>
+    <button class="btn btn-danger" @onclick="ClearLogs" disabled="@(logEntries.Count == 0)">Clear Log</button>
 </div>
 
 <table>
@@ -96,6 +97,26 @@
         {
             logEntries.Add(new LogEntry(DateTime.Now, "Error", "LogViewer",
                 $"Failed to read Event Log: {ex.Message}"));
+        }
+    }
+
+    private void ClearLogs()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) return;
+
+            using var eventLog = new EventLog("Application");
+            eventLog.Source = "WinSmtpRelay";
+            eventLog.Clear();
+
+            logEntries.Clear();
+        }
+        catch (Exception ex)
+        {
+            logEntries.Clear();
+            logEntries.Add(new LogEntry(DateTime.Now, "Error", "LogViewer",
+                $"Failed to clear Event Log: {ex.Message}. Run as Administrator to clear logs."));
         }
     }
 

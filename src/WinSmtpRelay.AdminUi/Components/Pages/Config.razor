@@ -6,6 +6,10 @@
 @inject IOptions<TlsOptions> TlsOpts
 @inject IOptions<DkimOptions> DkimOpts
 @inject IOptions<AdminUiOptions> AdminOpts
+@inject IOptions<RateLimitOptions> RateLimitOpts
+@inject IOptions<WebhookOptions> WebhookOpts
+@inject IOptions<MessageFilterOptions> FilterOpts
+@inject IOptions<BackupMxOptions> BackupMxOpts
 
 <h1>Configuration</h1>
 <p class="text-muted mb-1">Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
@@ -34,6 +38,13 @@
         <span class="text-muted">Max connections:</span> @SmtpOptions.Value.MaxConnections |
         <span class="text-muted">Allowed networks:</span> @string.Join(", ", SmtpOptions.Value.AllowedNetworks)
     </div>
+    @if (!string.IsNullOrWhiteSpace(SmtpOptions.Value.PickupFolder))
+    {
+        <div class="mt-1">
+            <span class="text-muted">Pickup folder:</span> @SmtpOptions.Value.PickupFolder
+            (poll every @SmtpOptions.Value.PickupFolderPollIntervalSeconds s)
+        </div>
+    }
 </div>
 
 <div class="card mb-1">
@@ -53,6 +64,29 @@
         Retry intervals: @string.Join(", ", DeliveryOpts.Value.RetryIntervalsMinutes.Select(m => $"{m}m"))
     </div>
 </div>
+
+@if (DeliveryOpts.Value.DomainRoutes.Count > 0)
+{
+    <div class="card mb-1">
+        <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Domain Routes</h3>
+        <table>
+            <thead>
+                <tr><th>Domain Pattern</th><th>Host</th><th>Port</th><th>Auth</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var route in DeliveryOpts.Value.DomainRoutes)
+                {
+                    <tr>
+                        <td class="mono">@route.DomainPattern</td>
+                        <td class="mono">@route.Host</td>
+                        <td class="mono">@route.Port</td>
+                        <td>@(!string.IsNullOrWhiteSpace(route.Username) ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 <div class="card mb-1">
     <h3 style="font-size:0.95rem;margin-bottom:0.75rem">TLS</h3>
@@ -83,6 +117,103 @@
         </div>
     }
 </div>
+
+<div class="card mb-1">
+    <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Rate Limiting</h3>
+    <div>
+        <span class="text-muted">Per-IP:</span> @RateLimitOpts.Value.MaxConnectionsPerIpPerMinute /min |
+        <span class="text-muted">Per-sender:</span> @RateLimitOpts.Value.MaxMessagesPerSenderPerMinute /min, @RateLimitOpts.Value.MaxMessagesPerSenderPerDay /day
+    </div>
+    <div class="mt-1">
+        <span class="text-muted">Failed auth ban:</span> after @RateLimitOpts.Value.FailedAuthBanThreshold attempts, ban for @RateLimitOpts.Value.FailedAuthBanMinutes min
+    </div>
+</div>
+
+@if (FilterOpts.Value.HeaderRewrites.Count > 0 || FilterOpts.Value.SenderRewrites.Count > 0)
+{
+    <div class="card mb-1">
+        <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Message Filters</h3>
+        @if (FilterOpts.Value.HeaderRewrites.Count > 0)
+        {
+            <div class="mb-1">
+                <strong style="font-size:0.85rem">Header Rewrites</strong>
+                <table>
+                    <thead>
+                        <tr><th>Header</th><th>Action</th><th>Match</th><th>Value</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in FilterOpts.Value.HeaderRewrites)
+                        {
+                            <tr>
+                                <td class="mono">@rule.HeaderName</td>
+                                <td>@rule.Action</td>
+                                <td class="mono">@(rule.MatchValue ?? "—")</td>
+                                <td class="mono">@(rule.NewValue ?? "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (FilterOpts.Value.SenderRewrites.Count > 0)
+        {
+            <div>
+                <strong style="font-size:0.85rem">Sender Rewrites</strong>
+                <table>
+                    <thead>
+                        <tr><th>From Pattern</th><th>To Address</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in FilterOpts.Value.SenderRewrites)
+                        {
+                            <tr>
+                                <td class="mono">@rule.FromPattern</td>
+                                <td class="mono">@rule.ToAddress</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@if (WebhookOpts.Value.OnMessageReceived.Count > 0)
+{
+    <div class="card mb-1">
+        <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Webhooks</h3>
+        <table>
+            <thead>
+                <tr><th>Event</th><th>URL</th><th>Timeout</th><th>Signed</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var wh in WebhookOpts.Value.OnMessageReceived)
+                {
+                    <tr>
+                        <td>message.received</td>
+                        <td class="mono">@wh.Url</td>
+                        <td>@wh.TimeoutSeconds s</td>
+                        <td>@(!string.IsNullOrWhiteSpace(wh.Secret) ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (BackupMxOpts.Value.Enabled)
+{
+    <div class="card mb-1">
+        <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Backup MX</h3>
+        <div>
+            <span class="text-muted">Domains:</span> @string.Join(", ", BackupMxOpts.Value.Domains)
+        </div>
+        <div class="mt-1">
+            <span class="text-muted">Retry interval:</span> @BackupMxOpts.Value.RetryIntervalMinutes min |
+            <span class="text-muted">Max hold:</span> @BackupMxOpts.Value.MaxHoldHours h (@(BackupMxOpts.Value.MaxHoldHours / 24) days)
+        </div>
+    </div>
+}
 
 <div class="card">
     <h3 style="font-size:0.95rem;margin-bottom:0.75rem">Admin UI</h3>
