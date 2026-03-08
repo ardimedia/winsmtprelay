@@ -124,6 +124,9 @@ public class SmtpRelayEndToEndTests
     [TestCategory("IntegrationAuthUpdate")]
     public async Task SendEmail_DeliversViaRelay()
     {
+        if (Environment.GetEnvironmentVariable("CI") is not null)
+            Assert.Inconclusive("Skipping real delivery test in CI — cloud runner IPs are typically blocklisted by Spamhaus");
+
         if (!await IsPort25ReachableAsync())
             Assert.Inconclusive("Outbound port 25 is not reachable — skipping real delivery test");
 
