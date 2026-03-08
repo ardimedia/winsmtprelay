@@ -10,7 +10,7 @@ public class UserService(RelayDbContext db) : IUserService
     {
         var user = await db.RelayUsers
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Username == username && u.IsEnabled, cancellationToken);
+            .SingleOrDefaultAsync(u => u.Username == username && u.IsEnabled, cancellationToken);
 
         if (user == null)
             return false;
@@ -22,7 +22,7 @@ public class UserService(RelayDbContext db) : IUserService
     {
         return await db.RelayUsers
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
+            .SingleOrDefaultAsync(u => u.Username == username, cancellationToken);
     }
 
     public async Task CreateUserAsync(string username, string password, CancellationToken cancellationToken = default)

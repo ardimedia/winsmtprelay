@@ -59,6 +59,29 @@
 /* Log row styles */
 .row-error { background: color-mix(in oklch, var(--destructive) 10%, transparent); }
 .row-warning { background: color-mix(in oklch, var(--chart-3) 10%, transparent); }
+.log-handled { opacity: 0.4; }
+.log-row-clickable { cursor: pointer; }
+
+/* Search input with clear button */
+.search-input-wrapper {
+    position: relative;
+    flex: 1;
+}
+.search-input-wrapper input { padding-right: 2rem; }
+.search-clear {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted-foreground);
+    padding: 0.125rem;
+    display: flex;
+    align-items: center;
+}
+.search-clear:hover { color: var(--foreground); }
 
 /* Form groups */
 .form-group {

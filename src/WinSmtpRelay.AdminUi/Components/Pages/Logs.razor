@@ -1,6 +1,7 @@
 @page "/logs"
-@using System.Diagnostics
 @using System.Diagnostics.Eventing.Reader
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -17,7 +18,12 @@
 <div class="page-header page-header-row">
     <div>
         <h1>Event Log</h1>
-        <p>Windows Event Log entries for WinSmtpRelay</p>
+        <p>
+            Windows Event Log entries for WinSmtpRelay@if (handledUntil.HasValue)
+            {
+                <text> &mdash; @unhandledCount new since last review</text>
+            }
+        </p>
     </div>
     <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
         <LucideIcon Name="info" /> About this page
@@ -25,24 +31,45 @@
 </div>
 
 <div class="search-bar">
-    <BbNativeSelect @bind-Value="selectedLevel">
-        <option value="">All Levels</option>
-        <option value="Information">Information</option>
-        <option value="Warning">Warning</option>
-        <option value="Error">Error</option>
-    </BbNativeSelect>
-    <div style="width:80px;"><BbInput Type="InputType.Number" @bind-Value="maxEntriesStr" /></div>
-    <BbButton Variant="ButtonVariant.Secondary" @onclick="LoadLogs">
+    <div class="search-input-wrapper">
+        <BbInput Placeholder="Search source or message..." Value="@searchText" ValueChanged="OnSearchChanged" />
+        @if (!string.IsNullOrEmpty(searchText))
+        {
+            <button class="search-clear" @onclick="@(() => OnSearchChanged(""))">
+                <LucideIcon Name="x" />
+            </button>
+        }
+    </div>
+    <div style="width:140px;flex-shrink:0;">
+        <BbNativeSelect Value="@selectedLevel" ValueChanged="@((string v) => OnLevelChanged(v))">
+            <option value="">All Levels</option>
+            <option value="Information">Information</option>
+            <option value="Warning">Warning</option>
+            <option value="Error">Error</option>
+        </BbNativeSelect>
+    </div>
+    <div style="width:100px;flex-shrink:0;"><BbInput Type="InputType.Number" Value="@maxEntriesStr" ValueChanged="OnMaxEntriesChanged" /></div>
+    <BbButton Variant="ButtonVariant.Secondary" @onclick="RefreshLogs">
         <LucideIcon Name="refresh-cw" />
         Refresh
     </BbButton>
-    <BbButton Variant="ButtonVariant.Destructive" @onclick="() => showClearConfirm = true" Disabled="@(logEntries.Count == 0)">
-        <LucideIcon Name="eraser" />
-        Clear Log
+    <BbButton Variant="ButtonVariant.Secondary" @onclick="MarkAllHandled" Disabled="@(logEntries.Count == 0 || unhandledCount == 0)">
+        <LucideIcon Name="check-check" />
+        Mark all as handled
     </BbButton>
+    @if (handledUntil.HasValue)
+    {
+        <BbButton Variant="ButtonVariant.Outline" @onclick="ResetWatermark">
+            Reset
+        </BbButton>
+    }
+    <div class="flex items-center gap-1">
+        <BbSwitch Checked="showHandled" CheckedChanged="ToggleShowHandled" id="show-handled" />
+        <BbLabel For="show-handled">Show handled</BbLabel>
+    </div>
 </div>
 
-<BbTable Data="@logEntries">
+<BbTable Data="@visibleEntries">
     <BbTableHeader>
         <BbTableRow TData="LogEntry">
             <BbTableHeaderCell TData="LogEntry">Time</BbTableHeaderCell>
@@ -52,56 +79,52 @@
         </BbTableRow>
     </BbTableHeader>
     <BbTableBody>
-        @if (logEntries.Count == 0)
+        @if (visibleEntries.Count == 0)
         {
             <BbTableRow TData="LogEntry">
-                <BbTableCell colspan="4" style="text-align:center;">No log entries found. The Windows Event Log source 'WinSmtpRelay' may not be registered.</BbTableCell>
-            </BbTableRow>
-        }
-        @foreach (var entry in logEntries)
-        {
-            <BbTableRow Item="@entry" class="@GetRowClass(entry.Level)">
-                <BbTableCell style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
-                <BbTableCell><span class="badge-status @GetBadgeCss(entry.Level)">@entry.Level</span></BbTableCell>
-                <BbTableCell>@entry.Source</BbTableCell>
-                <BbTableCell>
-                    @if (entry.Message.Length > 120)
+                <BbTableCell colspan="4" style="text-align:center;">
+                    @if (logEntries.Count > 0 && !showHandled)
                     {
-                        <BbTooltip>
-                            <BbTooltipTrigger>
-                                <span>@Truncate(entry.Message, 120)</span>
-                            </BbTooltipTrigger>
-                            <BbTooltipContent>
-                                <div style="max-width:400px;white-space:pre-wrap;">@entry.Message</div>
-                            </BbTooltipContent>
-                        </BbTooltip>
+                        <text>All entries are handled. Toggle &ldquo;Show handled&rdquo; to see them.</text>
                     }
                     else
                     {
-                        @entry.Message
+                        <text>No log entries found. The Windows Event Log source 'WinSmtpRelay' may not be registered.</text>
                     }
                 </BbTableCell>
+            </BbTableRow>
+        }
+        @foreach (var entry in visibleEntries)
+        {
+            <BbTableRow Item="@entry" class="@($"{GetRowClass(entry)} {(IsHandled(entry) ? "log-handled" : "")} log-row-clickable")" @onclick="() => selectedEntry = entry">
+                <BbTableCell style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
+                <BbTableCell><span class="badge-status @GetBadgeCss(entry.Level)">@entry.Level</span></BbTableCell>
+                <BbTableCell>@entry.Source</BbTableCell>
+                <BbTableCell>@Truncate(entry.Message, 120)</BbTableCell>
             </BbTableRow>
         }
     </BbTableBody>
 </BbTable>
 
-<BbAlertDialog @bind-Open="showClearConfirm">
-    <BbAlertDialogContent>
-        <BbAlertDialogHeader>
-            <BbAlertDialogTitle>Clear Event Log</BbAlertDialogTitle>
-            <BbAlertDialogDescription>This will permanently clear all WinSmtpRelay entries from the Windows Event Log. This action cannot be undone.</BbAlertDialogDescription>
-        </BbAlertDialogHeader>
-        <BbAlertDialogFooter>
-            <BbAlertDialogCancel>
-                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
-            </BbAlertDialogCancel>
-            <BbAlertDialogAction>
-                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmClearLogs">Clear</BbButton>
-            </BbAlertDialogAction>
-        </BbAlertDialogFooter>
-    </BbAlertDialogContent>
-</BbAlertDialog>
+<BbDialog Open="@(selectedEntry is not null)" OpenChanged="@(open => { if (!open) selectedEntry = null; })">
+    <BbDialogContent>
+        @if (selectedEntry is not null)
+        {
+            <BbDialogHeader>
+                <BbDialogTitle>
+                    <span class="badge-status @GetBadgeCss(selectedEntry.Level)">@selectedEntry.Level</span>
+                </BbDialogTitle>
+                <BbDialogDescription>@selectedEntry.Time.ToString("yyyy-MM-dd HH:mm:ss") &mdash; @selectedEntry.Source</BbDialogDescription>
+            </BbDialogHeader>
+            <div style="font-size:0.875rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow-y:auto;">@selectedEntry.Message</div>
+            <BbDialogFooter>
+                <BbDialogClose>
+                    <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+                </BbDialogClose>
+            </BbDialogFooter>
+        }
+    </BbDialogContent>
+</BbDialog>
 
 <BbDialog @bind-Open="showHelp">
     <BbDialogContent>
@@ -121,15 +144,19 @@
                 <li><strong>Warning</strong> &mdash; non-critical issues: temporary delivery failures, rate-limit hits, certificate expiry warnings.</li>
                 <li><strong>Error</strong> &mdash; critical failures: unhandled exceptions, database errors, TLS handshake failures.</li>
             </ul>
-            <h4 style="margin-top:1rem;">Filtering &amp; limits</h4>
+            <h4 style="margin-top:1rem;">Search &amp; filtering</h4>
             <p>
-                Use the level dropdown to show only a specific severity. The entry count field limits how many
-                entries are displayed (default 100). Click <strong>Refresh</strong> to reload from the Event Log.
+                Use the <strong>search box</strong> to filter entries by source or message text. The
+                <strong>level dropdown</strong> filters by severity. The <strong>entry count</strong> field
+                limits how many entries are loaded (default 100). Changes apply immediately. Click
+                <strong>Refresh</strong> to reload entries from the Windows Event Log.
             </p>
-            <h4 style="margin-top:1rem;">Clearing the log</h4>
+            <h4 style="margin-top:1rem;">Marking entries as handled</h4>
             <p>
-                The <strong>Clear Log</strong> button permanently removes all WinSmtpRelay entries from the
-                Windows Application Event Log. This requires the service to run with administrator privileges.
+                Click <strong>Mark all as handled</strong> to acknowledge all current entries. Handled entries
+                are dimmed and can be hidden with the <strong>Show handled</strong> toggle. The handled state
+                is stored in your browser &mdash; each admin has their own independent view. Use
+                <strong>Reset</strong> to clear the watermark and show all entries as unhandled again.
             </p>
         </div>
         <BbDialogFooter>
@@ -141,16 +168,98 @@
 </BbDialog>
 
 @code {
+    private const string StorageKey = "winsmtprelay-log-handled-until";
+    private const string ShowHandledKey = "winsmtprelay-log-show-handled";
+
     private bool showHelp;
     private List<LogEntry> logEntries = [];
     private string selectedLevel = "";
+    private string searchText = "";
     private string maxEntriesStr = "100";
-    private bool showClearConfirm;
     private int maxEntries => int.TryParse(maxEntriesStr, out var v) ? v : 100;
+
+    private DateTime? handledUntil;
+    private bool showHandled;
+    private int unhandledCount;
+    private List<LogEntry> visibleEntries = [];
+    private LogEntry? selectedEntry;
 
     protected override void OnInitialized()
     {
         LoadLogs();
+        UpdateVisibleEntries();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await ReadWatermark();
+        var showHandledStr = await JS.InvokeAsync<string?>("localStorage.getItem", ShowHandledKey);
+        showHandled = showHandledStr == "true";
+        UpdateUnhandledCount();
+        UpdateVisibleEntries();
+        StateHasChanged();
+    }
+
+    private async Task ReadWatermark()
+    {
+        var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+        if (stored is not null && DateTime.TryParse(stored, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+        {
+            handledUntil = dt;
+        }
+    }
+
+    private async Task MarkAllHandled()
+    {
+        var latest = logEntries.Count > 0 ? logEntries[0].Time : DateTime.UtcNow;
+        handledUntil = latest;
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, latest.ToString("O"));
+        UpdateUnhandledCount();
+        UpdateVisibleEntries();
+    }
+
+    private async Task ResetWatermark()
+    {
+        handledUntil = null;
+        await JS.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+        UpdateUnhandledCount();
+        UpdateVisibleEntries();
+    }
+
+    private async Task ToggleShowHandled(bool value)
+    {
+        showHandled = value;
+        await JS.InvokeVoidAsync("localStorage.setItem", ShowHandledKey, value ? "true" : "false");
+        UpdateVisibleEntries();
+    }
+
+    private Task OnSearchChanged(string value)
+    {
+        searchText = value;
+        UpdateVisibleEntries();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnLevelChanged(string value)
+    {
+        selectedLevel = value;
+        await RefreshLogs();
+    }
+
+    private async Task OnMaxEntriesChanged(string value)
+    {
+        maxEntriesStr = value;
+        await RefreshLogs();
+    }
+
+    private async Task RefreshLogs()
+    {
+        LoadLogs();
+        await ReadWatermark();
+        UpdateUnhandledCount();
+        UpdateVisibleEntries();
     }
 
     private void LoadLogs()
@@ -180,11 +289,15 @@
                     if (!string.IsNullOrEmpty(selectedLevel) && level != selectedLevel)
                         continue;
 
+                    var message = record.FormatDescription() ?? "(no message)";
+                    if (IsNoiseMessage(message))
+                        continue;
+
                     entries.Add(new LogEntry(
                         record.TimeCreated ?? DateTime.MinValue,
                         level,
                         record.ProviderName ?? "Unknown",
-                        record.FormatDescription() ?? "(no message)"));
+                        message));
                 }
             }
 
@@ -200,33 +313,28 @@
         }
     }
 
-    private void ConfirmClearLogs()
+    private static bool IsNoiseMessage(string message) =>
+        message.Contains("failure initializing profiling API", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsHandled(LogEntry entry) =>
+        handledUntil.HasValue && entry.Time <= handledUntil.Value;
+
+    private void UpdateUnhandledCount() =>
+        unhandledCount = logEntries.Count(e => !IsHandled(e));
+
+    private void UpdateVisibleEntries()
     {
-        ClearLogs();
-        showClearConfirm = false;
+        var entries = showHandled ? logEntries : logEntries.Where(e => !IsHandled(e));
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            entries = entries.Where(e =>
+                e.Source.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                e.Message.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+        }
+        visibleEntries = entries.ToList();
     }
 
-    private void ClearLogs()
-    {
-        try
-        {
-            if (!OperatingSystem.IsWindows()) return;
-
-            using var eventLog = new EventLog("Application");
-            eventLog.Source = "WinSmtpRelay";
-            eventLog.Clear();
-
-            logEntries.Clear();
-        }
-        catch (Exception ex)
-        {
-            logEntries.Clear();
-            logEntries.Add(new LogEntry(DateTime.Now, "Error", "LogViewer",
-                $"Failed to clear Event Log: {ex.Message}. Run as Administrator to clear logs."));
-        }
-    }
-
-    private static string GetRowClass(string level) => level switch
+    private string GetRowClass(LogEntry entry) => entry.Level switch
     {
         "Error" => "row-error",
         "Warning" => "row-warning",
