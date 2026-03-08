@@ -13,6 +13,16 @@ This flows to all assemblies, the Admin UI `/api/server/info` endpoint, and the 
 
 ### How to release a new version
 
+Lets Claude do a release on github:
+
+```
+D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
+make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
+make sure the version below is higher than the current one, otherwise aboard with a message
+bump to 1.0.0-beta1 and push
+```
+
+
 **1. Bump the version** in `Directory.Build.props`:
 
 ```xml
