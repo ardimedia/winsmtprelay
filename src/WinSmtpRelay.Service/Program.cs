@@ -58,6 +58,7 @@ if (adminUiConfig.Enabled)
             options.DetailedErrors = true);
     }
     builder.Services.AddSignalR();
+    builder.Services.AddSingleton<WinSmtpRelay.Core.Interfaces.IActivityNotifier, WinSmtpRelay.AdminApi.ActivityNotifier>();
     builder.Services.AddHttpClient();
     builder.Services.AddHostedService<WinSmtpRelay.Service.TrayIconService>();
 }

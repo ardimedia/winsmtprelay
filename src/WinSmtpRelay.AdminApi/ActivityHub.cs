@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using WinSmtpRelay.Core.Interfaces;
 
 namespace WinSmtpRelay.AdminApi;
 
@@ -10,10 +11,9 @@ public class ActivityHub : Hub
     }
 }
 
-public static class ActivityNotifier
+public class ActivityNotifier(IHubContext<ActivityHub> hub) : IActivityNotifier
 {
-    public static async Task NotifyMessageReceivedAsync(
-        IHubContext<ActivityHub> hub, string messageId, string sender, string recipients, int sizeBytes)
+    public async Task NotifyMessageReceivedAsync(string messageId, string sender, string recipients, int sizeBytes)
     {
         await hub.Clients.All.SendAsync("MessageReceived", new
         {
@@ -25,8 +25,7 @@ public static class ActivityNotifier
         });
     }
 
-    public static async Task NotifyDeliveryAttemptAsync(
-        IHubContext<ActivityHub> hub, string messageId, string recipient, string statusCode, string? remoteServer)
+    public async Task NotifyDeliveryAttemptAsync(string messageId, string recipient, string statusCode, string? remoteServer)
     {
         await hub.Clients.All.SendAsync("DeliveryAttempt", new
         {
@@ -38,8 +37,7 @@ public static class ActivityNotifier
         });
     }
 
-    public static async Task NotifyConnectionAsync(
-        IHubContext<ActivityHub> hub, string sourceIp, string eventType)
+    public async Task NotifyConnectionAsync(string sourceIp, string eventType)
     {
         await hub.Clients.All.SendAsync("SmtpConnection", new
         {

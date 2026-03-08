@@ -19,17 +19,20 @@ public class RelayMessageStore : MessageStore
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly EmailAuthenticationService _emailAuth;
     private readonly WebhookService _webhookService;
+    private readonly IActivityNotifier _activityNotifier;
     private readonly ILogger<RelayMessageStore> _logger;
 
     public RelayMessageStore(
         IServiceScopeFactory scopeFactory,
         EmailAuthenticationService emailAuth,
         WebhookService webhookService,
+        IActivityNotifier activityNotifier,
         ILogger<RelayMessageStore> logger)
     {
         _scopeFactory = scopeFactory;
         _emailAuth = emailAuth;
         _webhookService = webhookService;
+        _activityNotifier = activityNotifier;
         _logger = logger;
     }
 
@@ -95,8 +98,9 @@ public class RelayMessageStore : MessageStore
             messageId, id, sender, recipients, rawMessage.Length, sourceIp ?? "unknown",
             authResults.Spf.Verdict);
 
-        // Fire webhook notifications (fire-and-forget, do not block SMTP response)
+        // Fire notifications (fire-and-forget, do not block SMTP response)
         _ = _webhookService.NotifyMessageReceivedAsync(messageId, sender, recipients, rawMessage.Length, sourceIp, CancellationToken.None);
+        _ = _activityNotifier.NotifyMessageReceivedAsync(messageId, sender, recipients, rawMessage.Length);
 
         return SmtpResponse.Ok;
     }

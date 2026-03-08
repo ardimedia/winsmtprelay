@@ -4,5 +4,5 @@ namespace WinSmtpRelay.Core.Interfaces;
 
 public interface IDeliveryService
 {
-    Task DeliverAsync(QueuedMessage message, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DeliveryResult>> DeliverAsync(QueuedMessage message, CancellationToken cancellationToken = default);
 }

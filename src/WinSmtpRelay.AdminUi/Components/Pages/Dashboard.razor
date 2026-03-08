@@ -11,9 +11,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Dashboard</h1>
-    <p>Server overview and recent activity</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Server overview and recent activity</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
 
 @if (!loaded)
@@ -97,7 +102,44 @@ else
     </BbTable>
 }
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About the Dashboard</BbDialogTitle>
+            <BbDialogDescription>Understanding the server overview</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The Dashboard provides an at-a-glance overview of your WinSmtpRelay server.
+            </p>
+            <h4 style="margin-top:1rem;">Stat cards</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Queue Depth</strong> &mdash; number of messages currently waiting to be delivered. A high number may indicate delivery issues.</li>
+                <li><strong>Server Uptime</strong> &mdash; how long the WinSmtpRelay Windows service has been running.</li>
+                <li><strong>Version</strong> &mdash; the installed software version.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Recent Messages</h4>
+            <p>
+                Shows the 10 most recent messages across all statuses (queued, delivered, bounced).
+                This gives you a quick view of what is flowing through the relay.
+            </p>
+            <h4 style="margin-top:1rem;">Status meanings</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Queued</strong> &mdash; waiting for delivery or retry</li>
+                <li><strong>Delivered</strong> &mdash; successfully sent to the recipient's mail server</li>
+                <li><strong>Bounced</strong> &mdash; permanently failed after all retry attempts</li>
+            </ul>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private bool loaded;
     private int queueDepth;
     private string uptime = "";
@@ -110,7 +152,7 @@ else
         var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
 
         queueDepth = await queue.GetQueueDepthAsync();
-        recentMessages = await queue.GetPendingAsync(10);
+        recentMessages = await queue.GetRecentAsync(10);
 
         var process = System.Diagnostics.Process.GetCurrentProcess();
         var elapsed = DateTime.Now - process.StartTime;

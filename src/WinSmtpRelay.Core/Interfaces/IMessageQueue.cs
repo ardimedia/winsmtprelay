@@ -11,4 +11,5 @@ public interface IMessageQueue
     Task<int> GetQueueDepthAsync(CancellationToken cancellationToken = default);
     Task SetRetryAsync(long messageId, int retryCount, DateTime nextRetryUtc, CancellationToken cancellationToken = default);
     Task DeleteAsync(long messageId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<QueuedMessage>> GetRecentAsync(int maxCount, CancellationToken cancellationToken = default);
 }

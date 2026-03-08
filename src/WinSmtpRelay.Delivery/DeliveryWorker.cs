@@ -5,11 +5,13 @@ using Microsoft.Extensions.Options;
 using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
 using WinSmtpRelay.Core.Models;
+using WinSmtpRelay.Storage;
 
 namespace WinSmtpRelay.Delivery;
 
 public class DeliveryWorker(
     IServiceScopeFactory scopeFactory,
+    IActivityNotifier activityNotifier,
     IOptions<DeliveryOptions> options,
     IOptions<BackupMxOptions> backupMxOptions,
     ILogger<DeliveryWorker> logger) : BackgroundService
@@ -75,6 +77,7 @@ public class DeliveryWorker(
         using var scope = scopeFactory.CreateScope();
         var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
         var deliveryService = scope.ServiceProvider.GetRequiredService<IDeliveryService>();
+        var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
 
         await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivering, cancellationToken: cancellationToken);
 
@@ -98,6 +101,15 @@ public class DeliveryWorker(
                     await queue.UpdateStatusAsync(message.Id, MessageStatus.Bounced, $"Filtered: {result.RejectReason}", cancellationToken);
                     logger.LogInformation("Message {MessageId} rejected by filter: {Reason}",
                         message.MessageId, result.RejectReason);
+
+                    // Log filter rejection for each recipient
+                    var recipients = message.Recipients.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var recipient in recipients)
+                    {
+                        await LogDeliveryAsync(db, message.Id, recipient, "550", $"Filtered: {result.RejectReason}", null);
+                        _ = activityNotifier.NotifyDeliveryAttemptAsync(message.MessageId, recipient, "550", null);
+                    }
+
                     return;
                 }
                 if (result.ModifiedRawMessage != null)
@@ -108,8 +120,15 @@ public class DeliveryWorker(
                 }
             }
 
-            await deliveryService.DeliverAsync(message, cancellationToken);
+            var deliveryResults = await deliveryService.DeliverAsync(message, cancellationToken);
             await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivered, cancellationToken: cancellationToken);
+
+            // Log per-recipient delivery results and broadcast via SignalR
+            foreach (var dr in deliveryResults)
+            {
+                await LogDeliveryAsync(db, message.Id, dr.Recipient, dr.StatusCode, dr.StatusMessage, dr.RemoteServer);
+                _ = activityNotifier.NotifyDeliveryAttemptAsync(message.MessageId, dr.Recipient, dr.StatusCode, dr.RemoteServer);
+            }
 
             logger.LogInformation("Message {MessageId} (id={QueueId}) delivered successfully",
                 message.MessageId, message.Id);
@@ -118,6 +137,26 @@ public class DeliveryWorker(
         {
             logger.LogWarning(ex, "Delivery failed for message {MessageId} (id={QueueId}), attempt {Attempt}",
                 message.MessageId, message.Id, message.RetryCount + 1);
+
+            // Log per-recipient results if available (from DeliveryException)
+            if (ex is DeliveryException dex)
+            {
+                foreach (var dr in dex.Results)
+                {
+                    await LogDeliveryAsync(db, message.Id, dr.Recipient, dr.StatusCode, dr.StatusMessage, dr.RemoteServer);
+                    _ = activityNotifier.NotifyDeliveryAttemptAsync(message.MessageId, dr.Recipient, dr.StatusCode, dr.RemoteServer);
+                }
+            }
+            else
+            {
+                // Generic failure — log for all recipients
+                var recipients = message.Recipients.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var recipient in recipients)
+                {
+                    await LogDeliveryAsync(db, message.Id, recipient, "500", ex.Message, null);
+                    _ = activityNotifier.NotifyDeliveryAttemptAsync(message.MessageId, recipient, "500", null);
+                }
+            }
 
             message.RetryCount++;
             message.LastError = ex.Message;
@@ -148,6 +187,22 @@ public class DeliveryWorker(
                 await queue.SetRetryAsync(message.Id, message.RetryCount, nextRetry.Value, cancellationToken);
             }
         }
+    }
+
+    private static async Task LogDeliveryAsync(
+        RelayDbContext db, long queuedMessageId, string recipient,
+        string statusCode, string statusMessage, string? remoteServer)
+    {
+        db.DeliveryLogs.Add(new DeliveryLog
+        {
+            QueuedMessageId = queuedMessageId,
+            Recipient = recipient,
+            StatusCode = statusCode,
+            StatusMessage = statusMessage,
+            RemoteServer = remoteServer,
+            TimestampUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
     }
 
     internal static DateTime? CalculateNextRetry(int retryCount, DeliveryOptions config)

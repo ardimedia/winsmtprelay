@@ -29,7 +29,7 @@ public class SmtpDeliveryService : IDeliveryService
         _logger = logger;
     }
 
-    public async Task DeliverAsync(QueuedMessage message, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<DeliveryResult>> DeliverAsync(QueuedMessage message, CancellationToken cancellationToken = default)
     {
         var mimeMessage = await MimeMessage.LoadAsync(new MemoryStream(message.RawMessage), cancellationToken);
 
@@ -37,6 +37,7 @@ public class SmtpDeliveryService : IDeliveryService
         _dkimSigner.Sign(mimeMessage);
 
         var recipients = message.Recipients.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        var results = new List<DeliveryResult>();
 
         // Group recipients by domain for efficient delivery
         var byDomain = recipients.GroupBy(r => r.Split('@').Last(), StringComparer.OrdinalIgnoreCase);
@@ -46,11 +47,23 @@ public class SmtpDeliveryService : IDeliveryService
             var domain = domainGroup.Key;
             var domainRecipients = domainGroup.ToList();
 
-            await DeliverToDomainAsync(mimeMessage, message.Sender, domainRecipients, domain, cancellationToken);
+            var domainResults = await DeliverToDomainAsync(mimeMessage, message.Sender, domainRecipients, domain, cancellationToken);
+            results.AddRange(domainResults);
         }
+
+        // If any recipient failed, throw so DeliveryWorker can handle retry logic
+        var failures = results.Where(r => !r.Success).ToList();
+        if (failures.Count > 0)
+        {
+            throw new DeliveryException(
+                $"Delivery failed for {failures.Count} recipient(s): {string.Join("; ", failures.Select(f => $"{f.Recipient}: {f.StatusCode} {f.StatusMessage}"))}",
+                results);
+        }
+
+        return results;
     }
 
-    private async Task DeliverToDomainAsync(
+    private async Task<List<DeliveryResult>> DeliverToDomainAsync(
         MimeMessage mimeMessage,
         string sender,
         List<string> recipients,
@@ -62,22 +75,20 @@ public class SmtpDeliveryService : IDeliveryService
         if (route != null)
         {
             _logger.LogDebug("Using domain route {Pattern} for domain {Domain}", route.DomainPattern, domain);
-            await SendViaSmtpAsync(
+            return await SendViaSmtpAsync(
                 mimeMessage, sender, recipients,
                 route.Host, route.Port, route.Username, route.Password,
                 cancellationToken);
-            return;
         }
 
         // 2. Global smart host
         if (!string.IsNullOrWhiteSpace(_config.SmartHost))
         {
-            await SendViaSmtpAsync(
+            return await SendViaSmtpAsync(
                 mimeMessage, sender, recipients,
                 _config.SmartHost, _config.SmartHostPort,
                 _config.SmartHostUsername, _config.SmartHostPassword,
                 cancellationToken);
-            return;
         }
 
         // 3. Direct MX delivery
@@ -88,8 +99,7 @@ public class SmtpDeliveryService : IDeliveryService
         {
             try
             {
-                await SendViaSmtpAsync(mimeMessage, sender, recipients, mxHost, 25, null, null, cancellationToken);
-                return; // Success — stop trying other MX hosts
+                return await SendViaSmtpAsync(mimeMessage, sender, recipients, mxHost, 25, null, null, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -99,8 +109,15 @@ public class SmtpDeliveryService : IDeliveryService
             }
         }
 
-        throw new InvalidOperationException(
-            $"All MX hosts exhausted for domain {domain}", lastException);
+        // All MX hosts exhausted — return failure results for all recipients
+        var errorMessage = lastException?.Message ?? "All MX hosts exhausted";
+        return recipients.Select(r => new DeliveryResult
+        {
+            Recipient = r,
+            StatusCode = "550",
+            StatusMessage = $"All MX hosts exhausted for domain {domain}: {errorMessage}",
+            RemoteServer = mxHosts.FirstOrDefault()
+        }).ToList();
     }
 
     internal DomainRouteOptions? FindDomainRoute(string domain)
@@ -125,7 +142,7 @@ public class SmtpDeliveryService : IDeliveryService
         return null;
     }
 
-    private async Task SendViaSmtpAsync(
+    private async Task<List<DeliveryResult>> SendViaSmtpAsync(
         MimeMessage mimeMessage,
         string sender,
         List<string> recipients,
@@ -154,7 +171,25 @@ public class SmtpDeliveryService : IDeliveryService
         await client.SendAsync(mimeMessage, senderAddress, recipientAddresses, cancellationToken);
         await client.DisconnectAsync(true, cancellationToken);
 
+        var remoteServer = $"{host}:{port}";
         _logger.LogInformation("Delivered to {Recipients} via {Host}:{Port}",
             string.Join(", ", recipients), host, port);
+
+        return recipients.Select(r => new DeliveryResult
+        {
+            Recipient = r,
+            StatusCode = "250",
+            StatusMessage = $"Delivered via {remoteServer}",
+            RemoteServer = remoteServer
+        }).ToList();
     }
+}
+
+/// <summary>
+/// Exception that carries per-recipient delivery results even when some recipients fail.
+/// </summary>
+public class DeliveryException(string message, IReadOnlyList<DeliveryResult> results)
+    : Exception(message)
+{
+    public IReadOnlyList<DeliveryResult> Results { get; } = results;
 }

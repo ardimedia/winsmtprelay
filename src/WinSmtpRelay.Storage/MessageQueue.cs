@@ -57,4 +57,12 @@ public class MessageQueue(RelayDbContext db) : IMessageQueue
     {
         await db.QueuedMessages.Where(m => m.Id == messageId).ExecuteDeleteAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<QueuedMessage>> GetRecentAsync(int maxCount, CancellationToken cancellationToken = default)
+    {
+        return await db.QueuedMessages
+            .OrderByDescending(m => m.CreatedUtc)
+            .Take(maxCount)
+            .ToListAsync(cancellationToken);
+    }
 }
