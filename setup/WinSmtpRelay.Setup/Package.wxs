@@ -10,7 +10,7 @@
 
     <SummaryInformation Description="WinSmtpRelay — Open-Source SMTP Relay for Windows" />
 
-    <MajorUpgrade Schedule="afterInstallExecute"
+    <MajorUpgrade Schedule="afterInstallInitialize"
                   DowngradeErrorMessage="A newer version of WinSmtpRelay is already installed. Please uninstall it first."
                   AllowSameVersionUpgrades="yes" />
 
