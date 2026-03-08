@@ -7,7 +7,7 @@
     <ProductVersion Condition="'$(ProductVersion)' == ''">$(DefaultProductVersion)</ProductVersion>
     <OutputName Condition="'$(SelfContained)' == 'true'">WinSmtpRelay-$(ProductVersion)-x64-self-contained</OutputName>
     <OutputName Condition="'$(SelfContained)' != 'true'">WinSmtpRelay-$(ProductVersion)-x64</OutputName>
-    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained)</DefineConstants>
+    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained);PublishDir=$(PublishDir)</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(PublishDir)' == ''">
