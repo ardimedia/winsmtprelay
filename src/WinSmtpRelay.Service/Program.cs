@@ -8,6 +8,10 @@ using WinSmtpRelay.Delivery;
 using WinSmtpRelay.SmtpListener;
 using WinSmtpRelay.Storage;
 
+// Windows Services run from System32 — set working directory to exe location
+// so relative paths (SQLite DB, config files) resolve correctly
+Directory.SetCurrentDirectory(Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddWindowsService(options =>
