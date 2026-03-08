@@ -8,11 +8,20 @@
     <link rel="stylesheet" href="@Assets["_content/BlazorBlueprint.Components/blazorblueprint.css"]" />
     <link rel="stylesheet" href="@Assets["_content/WinSmtpRelay.AdminUi/css/theme.css"]" />
     <link rel="stylesheet" href="@Assets["_content/WinSmtpRelay.AdminUi/css/app.css"]" />
+    <script>
+        (function() {
+            var mode = localStorage.getItem('winsmtprelay-theme');
+            if (mode === 'dark') document.documentElement.classList.add('dark');
+            var theme = localStorage.getItem('winsmtprelay-color-theme');
+            if (theme) document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <ImportMap />
     <HeadOutlet @rendermode="RenderMode.InteractiveServer" />
 </head>
 <body>
     <Routes @rendermode="RenderMode.InteractiveServer" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/WinSmtpRelay.AdminUi/js/theme.js"]"></script>
 </body>
 </html>

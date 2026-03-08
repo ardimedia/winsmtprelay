@@ -1,0 +1,75 @@
+<div style="display:flex;align-items:center;gap:0.25rem;margin-left:auto">
+    <BbDropdownMenu>
+        <BbDropdownMenuTrigger>
+            <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small">
+                <LucideIcon Name="palette" />
+            </BbButton>
+        </BbDropdownMenuTrigger>
+        <BbDropdownMenuContent>
+            @foreach (var theme in _themes)
+            {
+                var t = theme;
+                <BbDropdownMenuItem @key="t.Value" @onclick="() => SetColorTheme(t.Value)">
+                    <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:@t.Swatch;border:1px solid var(--border);flex-shrink:0;margin-right:0.5rem"></span>
+                    @t.Name
+                    @if (_currentTheme == t.Value)
+                    {
+                        <LucideIcon Name="check" />
+                    }
+                </BbDropdownMenuItem>
+            }
+        </BbDropdownMenuContent>
+    </BbDropdownMenu>
+
+    <BbButton Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" @onclick="ToggleDarkMode">
+        @if (_isDark)
+        {
+            <LucideIcon Name="moon" />
+        }
+        else
+        {
+            <LucideIcon Name="sun" />
+        }
+    </BbButton>
+</div>
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private bool _isDark;
+    private string _currentTheme = "";
+
+    private record ThemeOption(string Name, string Value, string Swatch);
+
+    private static readonly ThemeOption[] _themes =
+    [
+        new("Mono", "", "oklch(0.5555 0 0)"),
+        new("Storm", "storm", "oklch(0.554 0.046 257.417)"),
+        new("Midnight", "midnight", "oklch(0.2050 0 0)"),
+        new("Pastel", "pastel", "oklch(0.7090 0.1592 293.5412)"),
+        new("Claude", "claude", "oklch(0.6171 0.1375 39.0427)"),
+        new("Twitter", "twitter", "oklch(0.6723 0.1606 244.9955)")
+    ];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isDark = await JS.InvokeAsync<bool>("themeInterop.isDarkMode");
+            _currentTheme = await JS.InvokeAsync<string>("themeInterop.getColorTheme");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        _isDark = !_isDark;
+        await JS.InvokeVoidAsync("themeInterop.toggleDarkMode", _isDark);
+    }
+
+    private async Task SetColorTheme(string theme)
+    {
+        _currentTheme = theme;
+        await JS.InvokeVoidAsync("themeInterop.setColorTheme", theme);
+    }
+}

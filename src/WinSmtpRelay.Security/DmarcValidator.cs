@@ -2,9 +2,10 @@ using DnsClient;
 using DnsClient.Protocol;
 using Microsoft.Extensions.Logging;
 using Nager.EmailAuthentication;
-using Nager.EmailAuthentication.Models;
+using Nager.EmailAuthentication.Models.Dmarc;
 using WinSmtpRelay.Security.Models;
 using DmarcPolicyLocal = WinSmtpRelay.Security.Models.DmarcPolicy;
+using NagerDmarcPolicy = Nager.EmailAuthentication.Models.Dmarc.DmarcPolicy;
 
 namespace WinSmtpRelay.Security;
 
@@ -41,13 +42,13 @@ public class DmarcValidator
             if (dmarcRaw is null)
                 return new DmarcCheckResult(DmarcVerdict.None, DmarcPolicyLocal.None, $"no DMARC record for {headerFromDomain}");
 
-            if (!DmarcRecordParser.TryParse(dmarcRaw, out var dmarcRecord))
+            if (!DmarcRecordParser.TryParse(dmarcRaw, out var dmarcRecordBase) || dmarcRecordBase is not DmarcRecordV1 dmarcRecord)
                 return new DmarcCheckResult(DmarcVerdict.PermError, DmarcPolicyLocal.None, "invalid DMARC record");
 
             var policy = dmarcRecord.DomainPolicy switch
             {
-                Nager.EmailAuthentication.Models.DmarcPolicy.Reject => DmarcPolicyLocal.Reject,
-                Nager.EmailAuthentication.Models.DmarcPolicy.Quarantine => DmarcPolicyLocal.Quarantine,
+                NagerDmarcPolicy.Reject => DmarcPolicyLocal.Reject,
+                NagerDmarcPolicy.Quarantine => DmarcPolicyLocal.Quarantine,
                 _ => DmarcPolicyLocal.None
             };
 
