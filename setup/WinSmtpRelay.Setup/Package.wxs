@@ -43,6 +43,7 @@
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="ConfigComponent" />
       <ComponentRef Id="FirewallRules" />
+      <ComponentRef Id="EventLogSource" />
       <ComponentRef Id="InstallDirPermissions" />
 
       <!-- Auto-harvested published files -->

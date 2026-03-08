@@ -71,6 +71,16 @@
                             Profile="all" />
     </Component>
 
+    <!-- Register Windows Event Log source (requires elevation — done at install time) -->
+    <Component Id="EventLogSource" Directory="INSTALLFOLDER" Guid="c3a9e5f1-4d6b-4a7c-b1e8-7d5f3c2a0b4e">
+      <RegistryValue Root="HKLM"
+                     Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\WinSmtpRelay.Service"
+                     Name="EventMessageFile"
+                     Type="string"
+                     Value="[INSTALLFOLDER]WinSmtpRelay.Service.exe"
+                     KeyPath="yes" />
+    </Component>
+
     <!-- Grant NetworkService modify access for SQLite database -->
     <Component Id="InstallDirPermissions" Directory="INSTALLFOLDER" Guid="b2f8d4e0-3c5a-4f9b-a0d7-6c4e2b1f8a3d">
       <CreateFolder>
