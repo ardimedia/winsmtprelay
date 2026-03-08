@@ -32,8 +32,8 @@ jobs:
             echo "TAG_LABEL=$TAG" >> "$GITHUB_ENV"
           else
             # Non-tag build: read Version and VersionSuffix from Directory.Build.props
-            VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
-            VERSION_SUFFIX=$(grep -oP '(?<=<VersionSuffix[^>]*>)[^<]+' Directory.Build.props || echo "")
+            VERSION=$(sed -n 's/.*<Version>\([^<]*\)<.*/\1/p' Directory.Build.props | head -1)
+            VERSION_SUFFIX=$(sed -n 's/.*<VersionSuffix[^>]*>\([^<]*\)<.*/\1/p' Directory.Build.props | head -1)
             echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
             echo "VERSION_SUFFIX=${VERSION_SUFFIX}" >> "$GITHUB_ENV"
             if [ -n "$VERSION_SUFFIX" ]; then
