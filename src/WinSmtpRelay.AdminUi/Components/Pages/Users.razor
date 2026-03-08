@@ -17,8 +17,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="flex justify-between items-center mb-1">
-    <h2>User Management</h2>
+<div class="page-header page-header-row">
+    <div>
+        <h1>User Management</h1>
+        <p>SMTP relay user accounts and permissions</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelpDialog = true">
+        <LucideIcon Name="info" /> What are SMTP users?
+    </BbButton>
 </div>
 
 <div style="max-width:400px;">
@@ -79,7 +85,7 @@ else
                 <BbTableRow Item="@user">
                     <BbTableCell>@user.Id</BbTableCell>
                     <BbTableCell>@user.Username</BbTableCell>
-                    <BbTableCell><BbBadge Variant="@(user.IsEnabled ? BadgeVariant.Default : BadgeVariant.Secondary)">@(user.IsEnabled ? "Yes" : "No")</BbBadge></BbTableCell>
+                    <BbTableCell><span class="badge-status @(user.IsEnabled ? "badge-success" : "badge-muted")">@(user.IsEnabled ? "Yes" : "No")</span></BbTableCell>
                     <BbTableCell style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">
                         @(string.IsNullOrEmpty(user.AllowedSenderAddresses) ? "Any" : user.AllowedSenderAddresses)
                     </BbTableCell>
@@ -163,12 +169,52 @@ else
     </BbAlertDialogContent>
 </BbAlertDialog>
 
+<BbDialog @bind-Open="showHelpDialog">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>What are SMTP Relay Users?</BbDialogTitle>
+            <BbDialogDescription>Understanding user accounts in WinSmtpRelay</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                These are <strong>SMTP relay accounts</strong> &mdash; credentials that applications
+                (web servers, ERP systems, monitoring tools) use to authenticate when submitting
+                email through WinSmtpRelay.
+            </p>
+            <h4 style="margin-top:1rem;">How it works</h4>
+            <ol style="padding-left:1.25rem;">
+                <li>An application connects to WinSmtpRelay on the SMTP port and authenticates with a username and password.</li>
+                <li>WinSmtpRelay validates the credentials and enforces per-user policies.</li>
+                <li>The message is queued and delivered to the recipient's mail server.</li>
+            </ol>
+            <h4 style="margin-top:1rem;">Per-user settings</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Allowed Senders</strong> &mdash; restricts which <em>From:</em> addresses this user can send as. Empty means any address.</li>
+                <li><strong>Rate Limit</strong> &mdash; throttles how many messages per minute/day this user can send.</li>
+                <li><strong>Enabled</strong> &mdash; disabled users are rejected at login.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Example</h4>
+            <p>
+                User <code>webapp</code> with allowed sender <code>noreply@example.com</code>
+                and rate limit <code>1000/day</code> &mdash; your web app can only send as that
+                address, max 1000 emails per day.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
     private IReadOnlyList<RelayUser> users = [];
     private string newUsername = "";
     private string newPassword = "";
     private string? statusMessage;
     private bool isLoading = true;
+    private bool showHelpDialog;
     private bool isEditDialogOpen;
     private bool showDeleteConfirm;
     private int deleteTargetId;

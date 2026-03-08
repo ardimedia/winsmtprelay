@@ -4,18 +4,22 @@
 @inject IServiceScopeFactory ScopeFactory
 
 <BbBreadcrumb>
-    <BbBreadcrumbList AutoSeparator="true">
+    <BbBreadcrumbList>
         <BbBreadcrumbItem>
             <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
         </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
         <BbBreadcrumbItem>
             <BbBreadcrumbPage>Queue</BbBreadcrumbPage>
         </BbBreadcrumbItem>
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="flex justify-between items-center mb-1">
-    <h1>Message Queue</h1>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Message Queue</h1>
+        <p>Queued, pending, and failed messages</p>
+    </div>
     <BbButton Variant="ButtonVariant.Default" @onclick="RefreshAsync">
         <LucideIcon Name="refresh-cw" /> Refresh
     </BbButton>
@@ -63,7 +67,7 @@ else
                     <BbTableCell>@msg.Sender</BbTableCell>
                     <BbTableCell>@msg.Recipients</BbTableCell>
                     <BbTableCell>@FormatSize(msg.SizeBytes)</BbTableCell>
-                    <BbTableCell><BbBadge Variant="@GetBadgeVariant(msg.Status)">@msg.Status</BbBadge></BbTableCell>
+                    <BbTableCell><span class="badge-status @GetBadgeCss(msg.Status)">@msg.Status</span></BbTableCell>
                     <BbTableCell>@msg.RetryCount</BbTableCell>
                     <BbTableCell>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</BbTableCell>
                     <BbTableCell>
@@ -165,11 +169,11 @@ else
         _ => $"{bytes / (1024.0 * 1024):F1} MB"
     };
 
-    private static BadgeVariant GetBadgeVariant(MessageStatus status) => status switch
+    private static string GetBadgeCss(MessageStatus status) => status switch
     {
-        MessageStatus.Delivered => BadgeVariant.Default,
-        MessageStatus.Failed or MessageStatus.Bounced => BadgeVariant.Destructive,
-        MessageStatus.Queued => BadgeVariant.Secondary,
-        _ => BadgeVariant.Outline
+        MessageStatus.Delivered => "badge-success",
+        MessageStatus.Failed or MessageStatus.Bounced => "badge-error",
+        MessageStatus.Queued => "badge-muted",
+        _ => "badge-muted"
     };
 }

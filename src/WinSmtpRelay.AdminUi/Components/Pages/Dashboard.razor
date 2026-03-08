@@ -4,14 +4,17 @@
 @inject IServiceScopeFactory ScopeFactory
 
 <BbBreadcrumb>
-    <BbBreadcrumbList AutoSeparator="true">
+    <BbBreadcrumbList>
         <BbBreadcrumbItem>
             <BbBreadcrumbPage>Dashboard</BbBreadcrumbPage>
         </BbBreadcrumbItem>
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<h1>Dashboard</h1>
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Server overview and recent activity</p>
+</div>
 
 @if (!loaded)
 {
@@ -86,7 +89,7 @@ else
                     <BbTableCell class="mono">@msg.Id</BbTableCell>
                     <BbTableCell>@msg.Sender</BbTableCell>
                     <BbTableCell>@msg.Recipients</BbTableCell>
-                    <BbTableCell><BbBadge Variant="@GetBadgeVariant(msg.Status)">@msg.Status</BbBadge></BbTableCell>
+                    <BbTableCell><span class="badge-status @GetBadgeCss(msg.Status)">@msg.Status</span></BbTableCell>
                     <BbTableCell>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</BbTableCell>
                 </BbTableRow>
             }
@@ -119,11 +122,11 @@ else
         loaded = true;
     }
 
-    private static BadgeVariant GetBadgeVariant(MessageStatus status) => status switch
+    private static string GetBadgeCss(MessageStatus status) => status switch
     {
-        MessageStatus.Delivered => BadgeVariant.Default,
-        MessageStatus.Failed or MessageStatus.Bounced => BadgeVariant.Destructive,
-        MessageStatus.Queued => BadgeVariant.Secondary,
-        _ => BadgeVariant.Outline
+        MessageStatus.Delivered => "badge-success",
+        MessageStatus.Failed or MessageStatus.Bounced => "badge-error",
+        MessageStatus.Queued => "badge-muted",
+        _ => "badge-muted"
     };
 }

@@ -17,8 +17,10 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<h2>Message Journal</h2>
-<p class="text-muted">Per-message delivery audit trail</p>
+<div class="page-header">
+    <h1>Message Journal</h1>
+    <p>Per-message delivery audit trail</p>
+</div>
 
 <div class="search-bar">
     <BbInput Type="InputType.Search" @bind-Value="searchTerm" Placeholder="Search by recipient, message ID, or status..." />
@@ -58,7 +60,7 @@ else
                     <BbTableCell>@log.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
                     <BbTableCell title="@($"Queue ID: {log.QueuedMessageId}")">@log.QueuedMessageId</BbTableCell>
                     <BbTableCell>@log.Recipient</BbTableCell>
-                    <BbTableCell><BbBadge Variant="@GetStatusVariant(log.StatusCode)">@log.StatusCode</BbBadge></BbTableCell>
+                    <BbTableCell><span class="badge-status @GetStatusCss(log.StatusCode)">@log.StatusCode</span></BbTableCell>
                     <BbTableCell>@(log.RemoteServer ?? "-")</BbTableCell>
                     <BbTableCell>
                         <BbTooltip>
@@ -173,11 +175,12 @@ else
         isLoading = false;
     }
 
-    private static BadgeVariant GetStatusVariant(string statusCode) => statusCode switch
+    private static string GetStatusCss(string statusCode) => statusCode switch
     {
-        "250" => BadgeVariant.Default,
-        _ when statusCode.StartsWith("5") => BadgeVariant.Destructive,
-        _ => BadgeVariant.Outline
+        "250" => "badge-success",
+        _ when statusCode.StartsWith("5") => "badge-error",
+        _ when statusCode.StartsWith("4") => "badge-warning",
+        _ => "badge-muted"
     };
 
     private static string Truncate(string text, int maxLen) =>
