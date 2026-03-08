@@ -62,7 +62,7 @@ jobs:
           -c Release -r win-x64 --self-contained true
           -p:Version=${{ env.VERSION }}
           -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
-          -o publish-sc/
+          -o ${{ github.workspace }}/publish-sc/
 
       - name: Publish Service (framework-dependent)
         run: >
@@ -70,7 +70,7 @@ jobs:
           -c Release -r win-x64 --self-contained false
           -p:Version=${{ env.VERSION }}
           -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
-          -o publish-fd/
+          -o ${{ github.workspace }}/publish-fd/
 
       # Code signing placeholder — uncomment when certificate is available
       # Requires GitHub secrets: CODE_SIGNING_CERTIFICATE (base64 PFX), CODE_SIGNING_PASSWORD
@@ -93,6 +93,18 @@ jobs:
       #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
       #     publish-fd/WinSmtpRelay.Service.exe
+
+      # Verify publish output before MSI build
+      - name: Verify publish output
+        shell: bash
+        run: |
+          echo "=== Self-contained publish ==="
+          ls -la publish-sc/ | head -20
+          echo "File count: $(find publish-sc/ -type f | wc -l)"
+          echo ""
+          echo "=== Framework-dependent publish ==="
+          ls -la publish-fd/ | head -20
+          echo "File count: $(find publish-fd/ -type f | wc -l)"
 
       # Build MSI installers into separate output directories
       - name: Build MSI (self-contained)
