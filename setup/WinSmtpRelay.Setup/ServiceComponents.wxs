@@ -72,12 +72,14 @@
     </Component>
 
     <!-- Register Windows Event Log source (requires elevation — done at install time) -->
+    <!-- EventMessageFile points to .NET Framework's generic message DLL (%1 format) -->
+    <!-- which is built into all modern Windows versions -->
     <Component Id="EventLogSource" Directory="INSTALLFOLDER" Guid="c3a9e5f1-4d6b-4a7c-b1e8-7d5f3c2a0b4e">
       <RegistryValue Root="HKLM"
                      Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\WinSmtpRelay.Service"
                      Name="EventMessageFile"
-                     Type="string"
-                     Value="[INSTALLFOLDER]WinSmtpRelay.Service.exe"
+                     Type="expandable"
+                     Value="%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll"
                      KeyPath="yes" />
     </Component>
 
