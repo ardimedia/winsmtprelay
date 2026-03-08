@@ -23,49 +23,10 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header page-header-row">
-    <div>
-        <h1>Configuration</h1>
-        <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
-    </div>
-    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
-        <LucideIcon Name="info" /> About this page
-    </BbButton>
+<div class="page-header">
+    <h1>Configuration</h1>
+    <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
 </div>
-
-<BbDialog @bind-Open="showHelp">
-    <BbDialogContent>
-        <BbDialogHeader>
-            <BbDialogTitle>About Configuration</BbDialogTitle>
-            <BbDialogDescription>Understanding the relay settings</BbDialogDescription>
-        </BbDialogHeader>
-        <div style="font-size:0.875rem;line-height:1.6;">
-            <p>
-                This page shows a <strong>read-only</strong> view of the current WinSmtpRelay configuration,
-                loaded from <code>appsettings.json</code>. To change settings, edit the file directly and
-                restart the Windows service.
-            </p>
-            <h4 style="margin-top:1rem;">Configuration tabs</h4>
-            <ul style="padding-left:1.25rem;">
-                <li><strong>Listener</strong> &mdash; SMTP endpoints (addresses, ports, TLS mode, authentication), max message size, allowed networks, and the optional pickup folder for file-based message submission.</li>
-                <li><strong>Delivery</strong> &mdash; outbound settings: smart host, concurrent delivery limit, retry intervals, max retry window, opportunistic TLS, and per-domain routing rules.</li>
-                <li><strong>Security</strong> &mdash; TLS certificate configuration, DKIM signing domains, and rate-limiting thresholds (per-IP connections, per-sender messages, failed-auth banning).</li>
-                <li><strong>Advanced</strong> &mdash; message filter rules (header/sender rewrites), webhook endpoints, backup MX settings, and Admin UI bind address.</li>
-            </ul>
-            <h4 style="margin-top:1rem;">Configuration file</h4>
-            <p>
-                The configuration file is located alongside the service executable, typically at
-                <code>C:\Program Files\WinSmtpRelay\appsettings.json</code>. Changes require a service restart
-                to take effect.
-            </p>
-        </div>
-        <BbDialogFooter>
-            <BbDialogClose>
-                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
-            </BbDialogClose>
-        </BbDialogFooter>
-    </BbDialogContent>
-</BbDialog>
 
 <BbTabs DefaultValue="listener">
     <BbTabsList>
@@ -76,6 +37,11 @@
     </BbTabsList>
 
     <BbTabsContent Value="listener">
+        <div class="tab-header-row">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showListenerHelp = true">
+                <LucideIcon Name="info" /> About Listener
+            </BbButton>
+        </div>
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>SMTP Listener</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -119,6 +85,11 @@
     </BbTabsContent>
 
     <BbTabsContent Value="delivery">
+        <div class="tab-header-row">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showDeliveryHelp = true">
+                <LucideIcon Name="info" /> About Delivery
+            </BbButton>
+        </div>
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>Delivery</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -171,6 +142,11 @@
     </BbTabsContent>
 
     <BbTabsContent Value="security">
+        <div class="tab-header-row">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showSecurityHelp = true">
+                <LucideIcon Name="info" /> About Security
+            </BbButton>
+        </div>
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>TLS</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -220,6 +196,11 @@
     </BbTabsContent>
 
     <BbTabsContent Value="advanced">
+        <div class="tab-header-row">
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showAdvancedHelp = true">
+                <LucideIcon Name="info" /> About Advanced
+            </BbButton>
+        </div>
         @if (FilterOpts.Value.HeaderRewrites.Count > 0 || FilterOpts.Value.SenderRewrites.Count > 0)
         {
             <BbCard Class="mb-1">
@@ -336,6 +317,154 @@
     </BbTabsContent>
 </BbTabs>
 
+<BbDialog @bind-Open="showListenerHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Listener</BbDialogTitle>
+            <BbDialogDescription>Understanding the SMTP listener settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The Listener tab configures how WinSmtpRelay accepts incoming SMTP connections.
+            </p>
+            <h4 style="margin-top:1rem;">SMTP Endpoints</h4>
+            <p>
+                Each endpoint defines a combination of bind address, port, TLS mode (off, STARTTLS, or implicit TLS),
+                and whether authentication is required. Common setups use port 25 for server-to-server relay and
+                port 587 for authenticated submission.
+            </p>
+            <h4 style="margin-top:1rem;">Connection limits</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Max message size</strong> &mdash; rejects messages larger than this limit during the SMTP DATA phase.</li>
+                <li><strong>Max connections</strong> &mdash; total concurrent SMTP connections allowed before new connections are refused.</li>
+                <li><strong>Allowed networks</strong> &mdash; CIDR ranges permitted to relay without authentication (e.g., internal subnets).</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Pickup folder</h4>
+            <p>
+                When configured, the relay monitors a directory for <code>.eml</code> files and queues them for delivery.
+                Useful for applications that write email files to disk instead of speaking SMTP.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showDeliveryHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Delivery</BbDialogTitle>
+            <BbDialogDescription>Understanding the outbound delivery settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The Delivery tab controls how WinSmtpRelay sends messages to their destination.
+            </p>
+            <h4 style="margin-top:1rem;">Delivery settings</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Concurrent deliveries</strong> &mdash; maximum number of messages sent simultaneously.</li>
+                <li><strong>Max retry</strong> &mdash; how long a message stays in the queue before being bounced as undeliverable.</li>
+                <li><strong>Retry intervals</strong> &mdash; the delay between each delivery attempt (e.g., 1m, 5m, 15m, 60m).</li>
+                <li><strong>Opportunistic TLS</strong> &mdash; when enabled, the relay upgrades to TLS if the remote server supports STARTTLS.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Smart host</h4>
+            <p>
+                Routes all outbound mail through a single upstream server instead of delivering directly via MX lookup.
+                Common when your network blocks outbound port 25.
+            </p>
+            <h4 style="margin-top:1rem;">Domain routes</h4>
+            <p>
+                Per-domain overrides that route specific recipient domains to a designated host, bypassing the default
+                smart host or MX delivery path.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showSecurityHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Security</BbDialogTitle>
+            <BbDialogDescription>Understanding the security settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The Security tab covers encryption, email authentication, and abuse prevention.
+            </p>
+            <h4 style="margin-top:1rem;">TLS</h4>
+            <p>
+                Configure the server certificate used for STARTTLS and implicit TLS connections. You can provide
+                a PFX file path or reference a certificate by thumbprint from the Windows certificate store.
+            </p>
+            <h4 style="margin-top:1rem;">DKIM</h4>
+            <p>
+                DomainKeys Identified Mail signs outbound messages with a cryptographic signature, allowing receiving
+                servers to verify the message was sent by an authorized sender for the domain.
+            </p>
+            <h4 style="margin-top:1rem;">Rate limiting</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Per-IP</strong> &mdash; limits connections per minute from a single IP address.</li>
+                <li><strong>Per-sender</strong> &mdash; limits messages per minute and per day from a single envelope sender.</li>
+                <li><strong>Failed auth ban</strong> &mdash; temporarily bans an IP after repeated authentication failures.</li>
+            </ul>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="showAdvancedHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Advanced</BbDialogTitle>
+            <BbDialogDescription>Understanding the advanced settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The Advanced tab contains specialized settings for message processing, integrations, and infrastructure.
+            </p>
+            <h4 style="margin-top:1rem;">Message filters</h4>
+            <p>
+                Header rewrites can add, remove, or modify email headers before delivery. Sender rewrites change the
+                envelope sender address based on pattern matching &mdash; useful for masking internal addresses.
+            </p>
+            <h4 style="margin-top:1rem;">Webhooks</h4>
+            <p>
+                HTTP callbacks triggered on events like message receipt. Can be signed with a shared secret for
+                verification. Useful for integrating with ticketing systems, chat platforms, or custom workflows.
+            </p>
+            <h4 style="margin-top:1rem;">Backup MX</h4>
+            <p>
+                When enabled, WinSmtpRelay acts as a secondary mail exchanger for the listed domains, holding messages
+                and retrying delivery to the primary server.
+            </p>
+            <h4 style="margin-top:1rem;">Admin UI</h4>
+            <p>
+                The bind address and port for this web interface (default: <code>0.0.0.0:8025</code>).
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
-    private bool showHelp;
+    private bool showListenerHelp;
+    private bool showDeliveryHelp;
+    private bool showSecurityHelp;
+    private bool showAdvancedHelp;
 }

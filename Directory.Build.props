@@ -1,0 +1,27 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      Single source of truth for the product version.
+      CI overrides this via -p:Version=x.y.z when building from a git tag.
+      Increment manually here when starting work on a new version.
+    -->
+    <Version>1.0.0</Version>
+    <VersionSuffix Condition="'$(VersionSuffix)' == ''">beta1</VersionSuffix>
+
+    <!-- File version: full version for Windows file properties -->
+    <FileVersion>$(Version).0</FileVersion>
+
+    <!-- Prevent .NET from appending the git commit hash to InformationalVersion -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- Informational version: includes pre-release suffix, shown in Admin UI /api/server/info -->
+    <InformationalVersion Condition="'$(VersionSuffix)' != ''">$(Version)-$(VersionSuffix)</InformationalVersion>
+    <InformationalVersion Condition="'$(VersionSuffix)' == ''">$(Version)</InformationalVersion>
+
+    <Product>WinSmtpRelay</Product>
+    <Company>ARDIMEDIA</Company>
+    <Copyright>Copyright (c) 2026 ARDIMEDIA</Copyright>
+  </PropertyGroup>
+
+</Project>

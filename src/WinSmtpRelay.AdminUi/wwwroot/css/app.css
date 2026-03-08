@@ -170,6 +170,13 @@ nav[aria-label="breadcrumb"] {
     justify-content: space-between;
 }
 
+/* Tab detail area: about button aligned right */
+.tab-header-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
 /* Badge overrides — less round, slightly larger */
 .badge-status {
     display: inline-flex;

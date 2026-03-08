@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -205,7 +206,9 @@ public static class AdminEndpoints
         group.MapGet("/server/info", () =>
         {
             var assembly = typeof(AdminEndpoints).Assembly;
-            var version = assembly.GetName().Version?.ToString() ?? "0.0.0";
+            var version = assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                          ?? assembly.GetName().Version?.ToString()
+                          ?? "0.0.0";
 
             return Results.Ok(new
             {

@@ -149,7 +149,9 @@
 
 @code {
     private bool showHelp;
-    private string currentVersion = typeof(Update).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+    private string currentVersion = typeof(Update).Assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                                     ?? typeof(Update).Assembly.GetName().Version?.ToString()
+                                     ?? "0.0.0";
     private bool isChecking;
     private string? errorMessage;
     private GitHubRelease? latestRelease;

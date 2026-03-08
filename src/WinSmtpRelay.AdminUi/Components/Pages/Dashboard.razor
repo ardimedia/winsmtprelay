@@ -265,7 +265,9 @@ else
         processStartTime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
         UpdateUptime();
 
-        version = typeof(Dashboard).Assembly.GetName().Version?.ToString() ?? "dev";
+        version = typeof(Dashboard).Assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                  ?? typeof(Dashboard).Assembly.GetName().Version?.ToString()
+                  ?? "dev";
         loaded = true;
 
         // Load initial chart data

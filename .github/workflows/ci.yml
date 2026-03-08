@@ -14,22 +14,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Derive version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Determine version
         shell: bash
         run: |
-          # Strip leading 'v' and any pre-release suffix (e.g. v1.0.0-beta1 → 1.0.0)
-          TAG="${GITHUB_REF_NAME#v}"
-          MSI_VERSION="${TAG%%-*}"
-          echo "PRODUCT_VERSION=$MSI_VERSION" >> "$GITHUB_ENV"
-          echo "TAG_LABEL=$TAG" >> "$GITHUB_ENV"
-
-      - name: Set default version
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        shell: bash
-        run: |
-          echo "PRODUCT_VERSION=1.0.0" >> "$GITHUB_ENV"
-          echo "TAG_LABEL=1.0.0-dev" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Tag build: v1.0.0-beta1 → VERSION=1.0.0, VERSION_SUFFIX=beta1, TAG_LABEL=1.0.0-beta1
+            TAG="${GITHUB_REF_NAME#v}"
+            echo "VERSION=${TAG%%-*}" >> "$GITHUB_ENV"
+            if [[ "$TAG" == *-* ]]; then
+              echo "VERSION_SUFFIX=${TAG#*-}" >> "$GITHUB_ENV"
+            else
+              echo "VERSION_SUFFIX=" >> "$GITHUB_ENV"
+            fi
+            echo "TAG_LABEL=$TAG" >> "$GITHUB_ENV"
+          else
+            # Non-tag build: use defaults from Directory.Build.props (1.0.0-beta1)
+            echo "VERSION=1.0.0" >> "$GITHUB_ENV"
+            echo "VERSION_SUFFIX=beta1" >> "$GITHUB_ENV"
+            echo "TAG_LABEL=1.0.0-dev" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -41,7 +44,10 @@ jobs:
         run: dotnet restore winsmtprelay.slnx
 
       - name: Build
-        run: dotnet build winsmtprelay.slnx --no-restore --configuration Release
+        run: >
+          dotnet build winsmtprelay.slnx --no-restore --configuration Release
+          -p:Version=${{ env.VERSION }}
+          -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
 
       - name: Test
         run: dotnet test winsmtprelay.slnx --no-build --configuration Release --verbosity normal
@@ -51,12 +57,16 @@ jobs:
         run: >
           dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj
           -c Release -r win-x64 --self-contained true
+          -p:Version=${{ env.VERSION }}
+          -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
           -o publish-sc/
 
       - name: Publish Service (framework-dependent)
         run: >
           dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj
           -c Release -r win-x64 --self-contained false
+          -p:Version=${{ env.VERSION }}
+          -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
           -o publish-fd/
 
       # Code signing placeholder — uncomment when certificate is available
@@ -87,7 +97,7 @@ jobs:
           dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
           -c Release
           -p:PublishDir=${{ github.workspace }}/publish-sc/
-          -p:ProductVersion=${{ env.PRODUCT_VERSION }}
+          -p:ProductVersion=${{ env.VERSION }}
           -p:SelfContained=true
           -p:OutputPath=${{ github.workspace }}/msi-sc/
 
@@ -96,7 +106,7 @@ jobs:
           dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
           -c Release
           -p:PublishDir=${{ github.workspace }}/publish-fd/
-          -p:ProductVersion=${{ env.PRODUCT_VERSION }}
+          -p:ProductVersion=${{ env.VERSION }}
           -p:SelfContained=false
           -p:OutputPath=${{ github.workspace }}/msi-fd/
 
@@ -104,13 +114,8 @@ jobs:
       - name: Rename MSI files
         shell: bash
         run: |
-          mv msi-sc/Release/en-US/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi" || \
-          mv msi-sc/en-US/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi" || \
-          mv msi-sc/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi"
-
-          mv msi-fd/Release/en-US/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi" || \
-          mv msi-fd/en-US/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi" || \
-          mv msi-fd/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi"
+          find msi-sc -name "WinSmtpRelay.Setup.msi" -exec mv {} "msi-sc/WinSmtpRelay-${VERSION}-x64-self-contained.msi" \;
+          find msi-fd -name "WinSmtpRelay.Setup.msi" -exec mv {} "msi-fd/WinSmtpRelay-${VERSION}-x64.msi" \;
 
       # Code signing placeholder — sign MSI files after build
       # - name: Sign MSI (self-contained)
@@ -118,14 +123,14 @@ jobs:
       #     signtool sign /f "${{ runner.temp }}\cert.pfx"
       #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
-      #     "msi-sc/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi"
+      #     "msi-sc/WinSmtpRelay-${{ env.VERSION }}-x64-self-contained.msi"
       #
       # - name: Sign MSI (framework-dependent)
       #   run: >
       #     signtool sign /f "${{ runner.temp }}\cert.pfx"
       #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
-      #     "msi-fd/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi"
+      #     "msi-fd/WinSmtpRelay-${{ env.VERSION }}-x64.msi"
       #
       # - name: Clean up certificate
       #   if: always()
@@ -135,14 +140,14 @@ jobs:
       - name: Upload MSI (self-contained)
         uses: actions/upload-artifact@v4
         with:
-          name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained
-          path: msi-sc/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
+          name: WinSmtpRelay-${{ env.VERSION }}-x64-self-contained
+          path: msi-sc/WinSmtpRelay-${{ env.VERSION }}-x64-self-contained.msi
 
       - name: Upload MSI (framework-dependent)
         uses: actions/upload-artifact@v4
         with:
-          name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64
-          path: msi-fd/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
+          name: WinSmtpRelay-${{ env.VERSION }}-x64
+          path: msi-fd/WinSmtpRelay-${{ env.VERSION }}-x64.msi
 
       # Create GitHub Release with MSI assets on tag push
       - name: Create GitHub Release
@@ -160,5 +165,5 @@ jobs:
             --title "WinSmtpRelay $TAG_LABEL" \
             --generate-notes \
             $IS_PRERELEASE \
-            "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi#WinSmtpRelay ${TAG_LABEL} (x64, self-contained)" \
-            "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi#WinSmtpRelay ${TAG_LABEL} (x64, requires .NET 10)"
+            "msi-sc/WinSmtpRelay-${VERSION}-x64-self-contained.msi#WinSmtpRelay ${TAG_LABEL} (x64, self-contained)" \
+            "msi-fd/WinSmtpRelay-${VERSION}-x64.msi#WinSmtpRelay ${TAG_LABEL} (x64, requires .NET 10)"
