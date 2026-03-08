@@ -97,10 +97,10 @@ dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj -c Release -
 
 ```bash
 # Self-contained
-dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:PublishDir=../../publish-sc/ -p:ProductVersion=1.0.0 -p:SelfContained=true
+dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-sc/ -p:ProductVersion=1.0.0 -p:SelfContained=true
 
 # Framework-dependent
-dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:PublishDir=../../publish-fd/ -p:ProductVersion=1.0.0 -p:SelfContained=false
+dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-fd/ -p:ProductVersion=1.0.0 -p:SelfContained=false
 ```
 
 Output: `setup/WinSmtpRelay.Setup/bin/Release/*.msi`
@@ -109,7 +109,7 @@ Output: `setup/WinSmtpRelay.Setup/bin/Release/*.msi`
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `PublishDir` | `../../publish/` | Path to `dotnet publish` output |
+| `HarvestPath` | `../../publish/` | Path to `dotnet publish` output |
 | `ProductVersion` | `1.0.0` | 3-part version number (no pre-release suffix) |
 | `SelfContained` | *(empty)* | Set to `true` for self-contained variant; changes output filename and skips .NET runtime check |
 

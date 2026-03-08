@@ -6,7 +6,7 @@
 
     <!-- Windows Service registration -->
     <Component Id="ServiceComponent" Directory="INSTALLFOLDER">
-      <File Id="ServiceExe" Source="$(var.PublishDir)\WinSmtpRelay.Service.exe" KeyPath="yes" />
+      <File Id="ServiceExe" Source="$(var.HarvestPath)\WinSmtpRelay.Service.exe" KeyPath="yes" />
 
       <ServiceInstall Id="WinSmtpRelayService"
                       Name="WinSmtpRelay"
@@ -32,7 +32,7 @@
 
     <!-- Configuration file — preserved on upgrade, kept on uninstall -->
     <Component Id="ConfigComponent" Directory="INSTALLFOLDER" NeverOverwrite="yes" Permanent="yes">
-      <File Id="AppSettings" Source="$(var.PublishDir)\appsettings.json" KeyPath="yes" />
+      <File Id="AppSettings" Source="$(var.HarvestPath)\appsettings.json" KeyPath="yes" />
     </Component>
 
     <!-- Windows Firewall inbound rules for SMTP and Admin UI -->

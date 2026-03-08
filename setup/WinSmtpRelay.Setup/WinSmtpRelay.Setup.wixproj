@@ -2,15 +2,16 @@
 
   <PropertyGroup>
     <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
     <SuppressIces>ICE61</SuppressIces>
     <!-- ProductVersion reads from Directory.Build.props $(Version), overridable via -p:ProductVersion -->
     <ProductVersion Condition="'$(ProductVersion)' == ''">$(Version)</ProductVersion>
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
-    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained);PublishDir=$(PublishDir)</DefineConstants>
+    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained);HarvestPath=$(HarvestPath)</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(PublishDir)' == ''">
-    <PublishDir>..\..\publish\</PublishDir>
+  <PropertyGroup Condition="'$(HarvestPath)' == ''">
+    <HarvestPath>..\..\publish\</HarvestPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,12 +20,5 @@
     <PackageReference Include="WixToolset.Util.wixext" Version="5.0.*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <HarvestDirectory Include="$(PublishDir)"
-                      ComponentGroupName="PublishedFiles"
-                      DirectoryRef="INSTALLFOLDER"
-                      SuppressRootDirectory="true"
-                      ExcludeFile="appsettings.json;appsettings.Development.json" />
-  </ItemGroup>
 
 </Project>

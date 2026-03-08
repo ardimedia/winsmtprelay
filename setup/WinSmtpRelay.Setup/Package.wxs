@@ -26,24 +26,26 @@
             Message="WinSmtpRelay requires the .NET 10 Runtime (x64). Please download and install it from https://dotnet.microsoft.com/download/dotnet/10.0 and run this installer again." />
     <?endif?>
 
-  </Package>
-
-  <!-- Directory structure -->
-  <Fragment>
+    <!-- Directory structure -->
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="WinSmtpRelay" />
     </StandardDirectory>
-  </Fragment>
 
-  <!-- Single feature containing all components -->
-  <Fragment>
+    <!-- Single feature containing all components -->
     <Feature Id="Complete" Title="WinSmtpRelay" Level="1">
-      <ComponentGroupRef Id="PublishedFiles" />
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="ConfigComponent" />
       <ComponentRef Id="FirewallRules" />
       <ComponentRef Id="InstallDirPermissions" />
+
+      <!-- Auto-harvested published files -->
+      <Files Directory="INSTALLFOLDER" Include="$(var.HarvestPath)**">
+        <Exclude Files="$(var.HarvestPath)appsettings.json" />
+        <Exclude Files="$(var.HarvestPath)appsettings.Development.json" />
+        <Exclude Files="$(var.HarvestPath)WinSmtpRelay.Service.exe" />
+      </Files>
     </Feature>
-  </Fragment>
+
+  </Package>
 
 </Wix>

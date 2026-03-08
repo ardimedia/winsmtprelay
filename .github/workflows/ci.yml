@@ -107,13 +107,13 @@ jobs:
           echo "File count: $(find publish-fd/ -type f | wc -l)"
 
       # Build MSI installers into separate output directories
-      # Note: PublishDir must use backslashes — WiX HarvestDirectory fails with mixed slashes on Windows
+      # Note: HarvestPath must use backslashes — WiX HarvestDirectory fails with mixed slashes on Windows
       - name: Build MSI (self-contained)
         shell: pwsh
         run: >
           dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
           -c Release
-          -p:PublishDir=${{ github.workspace }}\publish-sc\
+          -p:HarvestPath=${{ github.workspace }}\publish-sc\
           -p:ProductVersion=${{ env.VERSION }}
           -p:SelfContained=true
           -p:OutputPath=${{ github.workspace }}\msi-sc\
@@ -123,7 +123,7 @@ jobs:
         run: >
           dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
           -c Release
-          -p:PublishDir=${{ github.workspace }}\publish-fd\
+          -p:HarvestPath=${{ github.workspace }}\publish-fd\
           -p:ProductVersion=${{ env.VERSION }}
           -p:SelfContained=false
           -p:OutputPath=${{ github.workspace }}\msi-fd\
