@@ -123,6 +123,7 @@ jobs:
           -p:ProductVersion=${{ env.VERSION }}
           -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
           -p:SelfContained=true
+          -p:IntermediateOutputPath=${{ github.workspace }}\obj-msi-sc\
           -p:OutputPath=${{ github.workspace }}\msi-sc\
 
       - name: Build MSI (framework-dependent)
@@ -134,6 +135,7 @@ jobs:
           -p:ProductVersion=${{ env.VERSION }}
           -p:VersionSuffix=${{ env.VERSION_SUFFIX }}
           -p:SelfContained=false
+          -p:IntermediateOutputPath=${{ github.workspace }}\obj-msi-fd\
           -p:OutputPath=${{ github.workspace }}\msi-fd\
 
       # Rename MSIs from default project name to descriptive filenames
