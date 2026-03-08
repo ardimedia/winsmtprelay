@@ -236,12 +236,12 @@ else
         await RefreshAsync();
     }
 
-    private static string FormatSize(int bytes) => bytes switch
+    private static string FormatSize(int bytes)
     {
-        < 1024 => $"{bytes} B",
-        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
-        _ => $"{bytes / (1024.0 * 1024):F1} MB"
-    };
+        if (bytes is >= 0 and <= 1023) return $"{bytes} B";
+        if (bytes is >= 1024 and <= 1048575) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
 
     private static string GetBadgeCss(MessageStatus status) => status switch
     {

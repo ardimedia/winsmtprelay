@@ -14,6 +14,27 @@
 
 .stat-value.warning { color: var(--chart-3); }
 
+/* Chart inline counter */
+.chart-counter {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.chart-counter-label {
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+    font-weight: 500;
+}
+
+.chart-counter-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.chart-counter-value.warning { color: var(--chart-3); }
+
 /* Search bar */
 .search-bar {
     display: flex;

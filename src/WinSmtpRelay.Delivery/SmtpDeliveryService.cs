@@ -153,14 +153,19 @@ public class SmtpDeliveryService : IDeliveryService
         CancellationToken cancellationToken)
     {
         using var client = new SmtpClient(new MailKitProtocolLogger(_logger));
+        client.Timeout = _config.ConnectTimeoutSeconds * 1000;
 
         var tlsOption = _config.OpportunisticTls
             ? SecureSocketOptions.StartTlsWhenAvailable
             : SecureSocketOptions.None;
 
-        _logger.LogDebug("Connecting to {Host}:{Port} (TLS={TlsOption})", host, port, tlsOption);
+        _logger.LogDebug("Connecting to {Host}:{Port} (TLS={TlsOption}, Timeout={Timeout}s)",
+            host, port, tlsOption, _config.ConnectTimeoutSeconds);
 
-        await client.ConnectAsync(host, port, tlsOption, cancellationToken);
+        using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        connectCts.CancelAfter(TimeSpan.FromSeconds(_config.ConnectTimeoutSeconds));
+
+        await client.ConnectAsync(host, port, tlsOption, connectCts.Token);
 
         if (!string.IsNullOrWhiteSpace(username))
             await client.AuthenticateAsync(username, password, cancellationToken);

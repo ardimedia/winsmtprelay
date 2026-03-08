@@ -86,17 +86,17 @@ else
             <BbPagination>
                 <BbPaginationContent>
                     <BbPaginationItem>
-                        <BbPaginationPrevious @onclick="PrevPage" Disabled="@(currentPage <= 1)" />
+                        <BbPaginationPrevious OnClick="PrevPage" Disabled="@(currentPage <= 1)" />
                     </BbPaginationItem>
                     @for (var p = 1; p <= totalPages; p++)
                     {
                         var page = p;
                         <BbPaginationItem>
-                            <BbPaginationLink IsActive="@(page == currentPage)" @onclick="() => GoToPage(page)">@(page)</BbPaginationLink>
+                            <BbPaginationLink IsActive="@(page == currentPage)" OnClick="() => GoToPage(page)">@(page)</BbPaginationLink>
                         </BbPaginationItem>
                     }
                     <BbPaginationItem>
-                        <BbPaginationNext @onclick="NextPage" Disabled="@(currentPage >= totalPages)" />
+                        <BbPaginationNext OnClick="NextPage" Disabled="@(currentPage >= totalPages)" />
                     </BbPaginationItem>
                 </BbPaginationContent>
             </BbPagination>

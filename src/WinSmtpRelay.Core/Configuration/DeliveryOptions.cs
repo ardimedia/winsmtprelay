@@ -12,6 +12,7 @@ public class DeliveryOptions
     public string? SmartHostUsername { get; set; }
     public string? SmartHostPassword { get; set; }
     public bool OpportunisticTls { get; set; } = true;
+    public int ConnectTimeoutSeconds { get; set; } = 30;
 
     /// Per-domain routing: domain pattern to upstream relay config.
     /// Checked before global SmartHost. Supports wildcard prefix (e.g. "*.example.com").

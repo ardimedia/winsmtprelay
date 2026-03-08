@@ -1,7 +1,11 @@
 @page "/"
+@using Microsoft.AspNetCore.SignalR.Client
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager Navigation
+@inject IQueueDepthRecorder QueueDepthRecorder
+@implements IAsyncDisposable
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -63,7 +67,95 @@ else
     </div>
 }
 
-<h2 style="font-size:1.1rem; margin-bottom:0.75rem">Recent Messages</h2>
+<h2 style="font-size:1.1rem; margin-bottom:0.75rem">Email Volume</h2>
+
+<BbCard>
+    <BbCardContent>
+        <BbTabs DefaultValue="minute" @bind-Value="activeTab" @bind-Value:after="OnTabChanged">
+            <BbTabsList>
+                <BbTabsTrigger Value="minute">Minute</BbTabsTrigger>
+                <BbTabsTrigger Value="hour">Hour</BbTabsTrigger>
+                <BbTabsTrigger Value="day">Day</BbTabsTrigger>
+                <BbTabsTrigger Value="month">Month</BbTabsTrigger>
+            </BbTabsList>
+
+            <BbTabsContent Value="minute">
+                @if (minuteChartData is not null)
+                {
+                    <BbChart Data="@minuteChartData" Height="300px">
+                        <BbXAxis DataKey="label" />
+                        <BbYAxis />
+                        <BbChartTooltip />
+                        <BbChartLegend />
+                        <BbArea DataKey="sent" Name="Sent" Color="var(--chart-1)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                        <BbArea DataKey="failed" Name="Failed" Color="var(--chart-2)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                        <BbLine DataKey="queue" Name="Queue Depth" Color="var(--chart-3)" Curve="CurveType.Smooth" StrokeWidth="2" />
+                    </BbChart>
+                }
+                else
+                {
+                    <BbSkeleton Class="h-[300px] w-full" />
+                }
+            </BbTabsContent>
+
+            <BbTabsContent Value="hour">
+                @if (chartData is not null)
+                {
+                    <BbAreaChart Data="@chartData" Height="300px">
+                        <BbXAxis DataKey="label" />
+                        <BbYAxis />
+                        <BbChartTooltip />
+                        <BbChartLegend />
+                        <BbArea DataKey="sent" Name="Sent" Color="var(--chart-1)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                        <BbArea DataKey="failed" Name="Failed" Color="var(--chart-2)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                    </BbAreaChart>
+                }
+                else
+                {
+                    <BbSkeleton Class="h-[300px] w-full" />
+                }
+            </BbTabsContent>
+
+            <BbTabsContent Value="day">
+                @if (chartData is not null)
+                {
+                    <BbAreaChart Data="@chartData" Height="300px">
+                        <BbXAxis DataKey="label" />
+                        <BbYAxis />
+                        <BbChartTooltip />
+                        <BbChartLegend />
+                        <BbArea DataKey="sent" Name="Sent" Color="var(--chart-1)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                        <BbArea DataKey="failed" Name="Failed" Color="var(--chart-2)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                    </BbAreaChart>
+                }
+                else
+                {
+                    <BbSkeleton Class="h-[300px] w-full" />
+                }
+            </BbTabsContent>
+
+            <BbTabsContent Value="month">
+                @if (chartData is not null)
+                {
+                    <BbAreaChart Data="@chartData" Height="300px">
+                        <BbXAxis DataKey="label" />
+                        <BbYAxis />
+                        <BbChartTooltip />
+                        <BbChartLegend />
+                        <BbArea DataKey="sent" Name="Sent" Color="var(--chart-1)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                        <BbArea DataKey="failed" Name="Failed" Color="var(--chart-2)" FillOpacity="0.4" Curve="CurveType.Smooth" />
+                    </BbAreaChart>
+                }
+                else
+                {
+                    <BbSkeleton Class="h-[300px] w-full" />
+                }
+            </BbTabsContent>
+        </BbTabs>
+    </BbCardContent>
+</BbCard>
+
+<h2 style="font-size:1.1rem; margin:1.5rem 0 0.75rem">Recent Messages</h2>
 
 @if (!loaded)
 {
@@ -118,17 +210,16 @@ else
                 <li><strong>Server Uptime</strong> &mdash; how long the WinSmtpRelay Windows service has been running.</li>
                 <li><strong>Version</strong> &mdash; the installed software version.</li>
             </ul>
+            <h4 style="margin-top:1rem;">Email Volume</h4>
+            <p>
+                Shows email throughput over four time windows. The <strong>Minute</strong> and <strong>Hour</strong> tabs
+                update in real time via SignalR. The <strong>Day</strong> and <strong>Month</strong> tabs refresh when selected.
+            </p>
             <h4 style="margin-top:1rem;">Recent Messages</h4>
             <p>
                 Shows the 10 most recent messages across all statuses (queued, delivered, bounced).
                 This gives you a quick view of what is flowing through the relay.
             </p>
-            <h4 style="margin-top:1rem;">Status meanings</h4>
-            <ul style="padding-left:1.25rem;">
-                <li><strong>Queued</strong> &mdash; waiting for delivery or retry</li>
-                <li><strong>Delivered</strong> &mdash; successfully sent to the recipient's mail server</li>
-                <li><strong>Bounced</strong> &mdash; permanently failed after all retry attempts</li>
-            </ul>
         </div>
         <BbDialogFooter>
             <BbDialogClose>
@@ -146,22 +237,236 @@ else
     private string version = "";
     private IReadOnlyList<QueuedMessage> recentMessages = [];
 
+    private DateTime processStartTime;
+
+    // Chart state
+    private string activeTab = "minute";
+    private object[]? chartData;
+    private object[]? minuteChartData;
+    private HubConnection? hubConnection;
+    private bool _disposed;
+    private System.Threading.Timer? refreshTimer;
+    private System.Threading.Timer? uptimeTimer;
+    private System.Threading.Timer? minuteRefreshTimer;
+    private System.Threading.Timer? _chartDebounceTimer;
+
     protected override async Task OnInitializedAsync()
     {
-        using var scope = ScopeFactory.CreateScope();
-        var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        // Load stat cards + recent messages
+        queueDepth = QueueDepthRecorder.CurrentDepth;
+        using (var scope = ScopeFactory.CreateScope())
+        {
+            var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+            if (queueDepth == 0)
+                queueDepth = await queue.GetQueueDepthAsync();
+            recentMessages = await queue.GetRecentAsync(10);
+        }
 
-        queueDepth = await queue.GetQueueDepthAsync();
-        recentMessages = await queue.GetRecentAsync(10);
-
-        var process = System.Diagnostics.Process.GetCurrentProcess();
-        var elapsed = DateTime.Now - process.StartTime;
-        uptime = elapsed.Days > 0
-            ? $"{elapsed.Days}d {elapsed.Hours}h {elapsed.Minutes}m"
-            : $"{elapsed.Hours}h {elapsed.Minutes}m";
+        processStartTime = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+        UpdateUptime();
 
         version = typeof(Dashboard).Assembly.GetName().Version?.ToString() ?? "dev";
         loaded = true;
+
+        // Load initial chart data
+        await LoadChartDataAsync();
+
+        // Set up SignalR for live tabs + queue depth updates
+        await SetupSignalRAsync();
+
+        // Periodic refresh: uptime every 30s
+        uptimeTimer = new System.Threading.Timer(_ =>
+        {
+            if (_disposed) return;
+            UpdateUptime();
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+
+        // Boundary-aligned refresh: hour tab on full minute, day on full hour, month on midnight
+        ScheduleNextBoundaryRefresh();
+
+        // Every second: refresh minute chart from server-side queue depth history
+        minuteRefreshTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_disposed) return;
+            queueDepth = QueueDepthRecorder.CurrentDepth;
+            if (activeTab == "minute")
+            {
+                await LoadChartDataAsync();
+                if (!_disposed) await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void UpdateUptime()
+    {
+        var elapsed = DateTime.Now - processStartTime;
+        uptime = elapsed.Days > 0
+            ? $"{elapsed.Days}d {elapsed.Hours}h {elapsed.Minutes}m"
+            : $"{elapsed.Hours}h {elapsed.Minutes}m";
+    }
+
+    private async Task SetupSignalRAsync()
+    {
+        var hubUrl = Navigation.ToAbsoluteUri("/hubs/activity");
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<dynamic>("DeliveryAttempt", (data) =>
+        {
+            if (_disposed) return;
+            ScheduleChartRefresh();
+        });
+
+        // QueueChanged sends no arguments — use parameterless On
+        hubConnection.On("QueueChanged", () =>
+        {
+            if (_disposed) return;
+            InvokeAsync(async () =>
+            {
+                queueDepth = QueueDepthRecorder.CurrentDepth;
+                await RefreshRecentMessagesAsync();
+                StateHasChanged();
+            });
+        });
+
+        hubConnection.On<dynamic>("MessageReceived", (data) =>
+        {
+            if (_disposed) return;
+            InvokeAsync(async () =>
+            {
+                queueDepth = QueueDepthRecorder.CurrentDepth;
+                await RefreshRecentMessagesAsync();
+                StateHasChanged();
+            });
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+        }
+        catch
+        {
+            // Will auto-reconnect
+        }
+    }
+
+    private async Task RefreshRecentMessagesAsync()
+    {
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+            recentMessages = await queue.GetRecentAsync(10);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Debounces chart refresh so rapid-fire DeliveryAttempt events
+    /// (one per recipient) don't cause N concurrent DB queries.
+    /// </summary>
+    private void ScheduleChartRefresh()
+    {
+        _chartDebounceTimer?.Dispose();
+        _chartDebounceTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_disposed) return;
+            if (activeTab == "minute" || activeTab == "hour")
+            {
+                await LoadChartDataAsync();
+                if (!_disposed) await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+    }
+
+    private void ScheduleNextBoundaryRefresh()
+    {
+        var now = DateTime.UtcNow;
+        // Next full minute
+        var nextMinute = now.AddSeconds(60 - now.Second).AddMilliseconds(-now.Millisecond);
+        var delay = nextMinute - now;
+        if (delay <= TimeSpan.Zero) delay = TimeSpan.FromSeconds(1);
+
+        refreshTimer?.Dispose();
+        refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_disposed) return;
+            var utcNow = DateTime.UtcNow;
+
+            // Every full minute: refresh hour tab
+            if (activeTab == "hour")
+            {
+                await LoadChartDataAsync();
+                if (!_disposed) await InvokeAsync(StateHasChanged);
+            }
+
+            // Every full hour: refresh day tab
+            if (utcNow.Minute == 0 && activeTab == "day")
+            {
+                await LoadChartDataAsync();
+                if (!_disposed) await InvokeAsync(StateHasChanged);
+            }
+
+            // At midnight: refresh month tab
+            if (utcNow.Hour == 0 && utcNow.Minute == 0 && activeTab == "month")
+            {
+                await LoadChartDataAsync();
+                if (!_disposed) await InvokeAsync(StateHasChanged);
+            }
+
+            // Re-schedule aligned to the next full minute
+            if (!_disposed) ScheduleNextBoundaryRefresh();
+        }, null, delay, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task OnTabChanged()
+    {
+        chartData = null;
+        minuteChartData = null;
+        await LoadChartDataAsync();
+    }
+
+    private async Task LoadChartDataAsync()
+    {
+        try
+        {
+            using var scope = ScopeFactory.CreateScope();
+            var stats = scope.ServiceProvider.GetRequiredService<IStatisticsService>();
+
+            if (activeTab == "minute")
+            {
+                var buckets = await stats.GetLiveStatisticsAsync();
+                var depthHistory = QueueDepthRecorder.GetHistory();
+                minuteChartData = buckets.Select(b =>
+                {
+                    var depth = depthHistory.TryGetValue(b.Label, out var v) ? v : 0;
+                    return (object)new { label = b.Label, sent = b.Sent, failed = b.Failed, queue = depth };
+                }).ToArray();
+            }
+            else if (activeTab == "month")
+            {
+                var monthly = await stats.GetMonthlyStatisticsAsync();
+                chartData = monthly.Select(m => (object)new { label = m.Date, sent = m.Sent, failed = m.Failed }).ToArray();
+            }
+            else
+            {
+                var buckets = activeTab switch
+                {
+                    "hour" => await stats.GetHourlyStatisticsAsync(),
+                    "day" => await stats.GetDailyStatisticsAsync(),
+                    _ => await stats.GetHourlyStatisticsAsync()
+                };
+                chartData = buckets.Select(b => (object)new { label = b.Label, sent = b.Sent, failed = b.Failed }).ToArray();
+            }
+        }
+        catch
+        {
+            chartData = [];
+            minuteChartData = [];
+        }
     }
 
     private static string GetBadgeCss(MessageStatus status) => status switch
@@ -171,4 +476,18 @@ else
         MessageStatus.Queued => "badge-muted",
         _ => "badge-muted"
     };
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _chartDebounceTimer?.Dispose();
+        if (minuteRefreshTimer is not null)
+            await minuteRefreshTimer.DisposeAsync();
+        if (uptimeTimer is not null)
+            await uptimeTimer.DisposeAsync();
+        if (refreshTimer is not null)
+            await refreshTimer.DisposeAsync();
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
 }

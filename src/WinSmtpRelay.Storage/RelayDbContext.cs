@@ -8,6 +8,7 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
     public DbSet<QueuedMessage> QueuedMessages => Set<QueuedMessage>();
     public DbSet<DeliveryLog> DeliveryLogs => Set<DeliveryLog>();
     public DbSet<RelayUser> RelayUsers => Set<RelayUser>();
+    public DbSet<DailyStatistics> DailyStatistics => Set<DailyStatistics>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -38,6 +39,11 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Username).IsUnique();
             entity.Property(e => e.Username).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<DailyStatistics>(entity =>
+        {
+            entity.HasKey(e => e.Date);
         });
     }
 }

@@ -26,6 +26,7 @@ builder.Services.Configure<RateLimitOptions>(builder.Configuration.GetSection(Ra
 builder.Services.Configure<WebhookOptions>(builder.Configuration.GetSection(WebhookOptions.SectionName));
 builder.Services.Configure<MessageFilterOptions>(builder.Configuration.GetSection(MessageFilterOptions.SectionName));
 builder.Services.Configure<BackupMxOptions>(builder.Configuration.GetSection(BackupMxOptions.SectionName));
+builder.Services.Configure<StatisticsOptions>(builder.Configuration.GetSection(StatisticsOptions.SectionName));
 
 // Storage
 var connectionString = builder.Configuration.GetConnectionString("RelayDb") ?? "Data Source=winsmtprelay.db";
@@ -58,9 +59,13 @@ if (adminUiConfig.Enabled)
             options.DetailedErrors = true);
     }
     builder.Services.AddSignalR();
+    builder.Services.AddSingleton<WinSmtpRelay.Storage.QueueDepthRecorder>();
+    builder.Services.AddSingleton<WinSmtpRelay.Core.Interfaces.IQueueDepthRecorder>(sp => sp.GetRequiredService<WinSmtpRelay.Storage.QueueDepthRecorder>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<WinSmtpRelay.Storage.QueueDepthRecorder>());
     builder.Services.AddSingleton<WinSmtpRelay.Core.Interfaces.IActivityNotifier, WinSmtpRelay.AdminApi.ActivityNotifier>();
     builder.Services.AddHttpClient();
     builder.Services.AddHostedService<WinSmtpRelay.Service.TrayIconService>();
+    builder.Services.AddHostedService<WinSmtpRelay.Service.StatisticsAggregator>();
 }
 
 var app = builder.Build();

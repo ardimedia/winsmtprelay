@@ -23,6 +23,7 @@ public static class AdminEndpoints
         MapUserEndpoints(group);
         MapDkimEndpoints(group);
         MapServerEndpoints(group);
+        MapStatisticsEndpoints(group);
 
         return endpoints;
     }
@@ -214,6 +215,22 @@ public static class AdminEndpoints
                 StartedUtc = System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()
             });
         });
+    }
+    private static void MapStatisticsEndpoints(RouteGroupBuilder group)
+    {
+        var stats = group.MapGroup("/statistics");
+
+        stats.MapGet("/live", async (IStatisticsService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetLiveStatisticsAsync(ct)));
+
+        stats.MapGet("/hourly", async (IStatisticsService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetHourlyStatisticsAsync(ct)));
+
+        stats.MapGet("/daily", async (IStatisticsService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetDailyStatisticsAsync(ct)));
+
+        stats.MapGet("/monthly", async (IStatisticsService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetMonthlyStatisticsAsync(ct)));
     }
 }
 

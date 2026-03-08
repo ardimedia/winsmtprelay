@@ -30,20 +30,38 @@ public class DeliveryWorker(
         {
             try
             {
-                using var scope = scopeFactory.CreateScope();
-                var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+                // Wait for a free delivery slot before fetching work
+                await semaphore.WaitAsync(stoppingToken);
 
-                var pending = await queue.GetPendingAsync(config.MaxConcurrentDeliveries, stoppingToken);
-
-                if (pending.Count == 0)
+                IReadOnlyList<QueuedMessage> pending;
+                try
                 {
-                    await Task.Delay(PollInterval, stoppingToken);
-                    continue;
+                    using var scope = scopeFactory.CreateScope();
+                    var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+                    pending = await queue.GetPendingAsync(1, stoppingToken);
+
+                    if (pending.Count == 0)
+                    {
+                        semaphore.Release();
+                        await Task.Delay(PollInterval, stoppingToken);
+                        continue;
+                    }
+
+                    // Mark as Delivering BEFORE Task.Run to prevent the next loop
+                    // iteration from picking up the same message again
+                    await queue.UpdateStatusAsync(pending[0].Id, MessageStatus.Delivering, cancellationToken: stoppingToken);
+                    _ = activityNotifier.NotifyQueueChangedAsync();
+                }
+                catch
+                {
+                    semaphore.Release();
+                    throw;
                 }
 
-                var tasks = pending.Select(async message =>
+                // Fire and forget — semaphore is released when processing completes
+                var message = pending[0];
+                _ = Task.Run(async () =>
                 {
-                    await semaphore.WaitAsync(stoppingToken);
                     try
                     {
                         await ProcessMessageAsync(message, stoppingToken);
@@ -52,9 +70,7 @@ public class DeliveryWorker(
                     {
                         semaphore.Release();
                     }
-                });
-
-                await Task.WhenAll(tasks);
+                }, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -78,9 +94,6 @@ public class DeliveryWorker(
         var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
         var deliveryService = scope.ServiceProvider.GetRequiredService<IDeliveryService>();
         var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
-
-        await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivering, cancellationToken: cancellationToken);
-        _ = activityNotifier.NotifyQueueChangedAsync();
 
         try
         {

@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IMessageQueue, MessageQueue>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IStatisticsService, StatisticsService>();
 
         return services;
     }
