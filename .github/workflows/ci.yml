@@ -3,18 +3,36 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
-
-env:
-  PRODUCT_VERSION: '1.0.0'
 
 jobs:
   build:
     runs-on: windows-latest
 
+    env:
+      PRODUCT_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.0.0' }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          # Strip leading 'v' and any pre-release suffix (e.g. v1.0.0-beta1 → 1.0.0)
+          TAG="${GITHUB_REF_NAME#v}"
+          MSI_VERSION="${TAG%%-*}"
+          echo "PRODUCT_VERSION=$MSI_VERSION" >> "$GITHUB_ENV"
+          echo "TAG_LABEL=$TAG" >> "$GITHUB_ENV"
+
+      - name: Set default version
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        shell: bash
+        run: |
+          echo "PRODUCT_VERSION=1.0.0" >> "$GITHUB_ENV"
+          echo "TAG_LABEL=1.0.0-dev" >> "$GITHUB_ENV"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -102,7 +120,7 @@ jobs:
       #   if: always()
       #   run: Remove-Item "${{ runner.temp }}\cert.pfx" -Force -ErrorAction SilentlyContinue
 
-      # Upload MSI artifacts
+      # Upload MSI artifacts (always available for download from workflow run)
       - name: Upload MSI (self-contained)
         uses: actions/upload-artifact@v4
         with:
@@ -114,3 +132,22 @@ jobs:
         with:
           name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64
           path: setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
+
+      # Create GitHub Release with MSI assets on tag push
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          IS_PRERELEASE=""
+          if echo "$TAG_LABEL" | grep -qE "(alpha|beta|rc|preview)"; then
+            IS_PRERELEASE="--prerelease"
+          fi
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "WinSmtpRelay $TAG_LABEL" \
+            --generate-notes \
+            $IS_PRERELEASE \
+            "setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi#WinSmtpRelay ${TAG_LABEL} (x64, self-contained)" \
+            "setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi#WinSmtpRelay ${TAG_LABEL} (x64, requires .NET 10)"
