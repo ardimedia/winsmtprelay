@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  PRODUCT_VERSION: '1.0.0'
+
 jobs:
   build:
     runs-on: windows-latest
@@ -27,3 +30,87 @@ jobs:
 
       - name: Test
         run: dotnet test winsmtprelay.slnx --no-build --configuration Release --verbosity normal
+
+      # Publish both variants for MSI packaging
+      - name: Publish Service (self-contained)
+        run: >
+          dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj
+          -c Release -r win-x64 --self-contained true
+          -o publish-sc/
+
+      - name: Publish Service (framework-dependent)
+        run: >
+          dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj
+          -c Release -r win-x64 --self-contained false
+          -o publish-fd/
+
+      # Code signing placeholder — uncomment when certificate is available
+      # Requires GitHub secrets: CODE_SIGNING_CERTIFICATE (base64 PFX), CODE_SIGNING_PASSWORD
+      #
+      # - name: Decode signing certificate
+      #   run: |
+      #     $certBytes = [Convert]::FromBase64String("${{ secrets.CODE_SIGNING_CERTIFICATE }}")
+      #     [IO.File]::WriteAllBytes("${{ runner.temp }}\cert.pfx", $certBytes)
+      #
+      # - name: Sign EXE (self-contained)
+      #   run: >
+      #     signtool sign /f "${{ runner.temp }}\cert.pfx"
+      #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
+      #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
+      #     publish-sc/WinSmtpRelay.Service.exe
+      #
+      # - name: Sign EXE (framework-dependent)
+      #   run: >
+      #     signtool sign /f "${{ runner.temp }}\cert.pfx"
+      #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
+      #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
+      #     publish-fd/WinSmtpRelay.Service.exe
+
+      # Build MSI installers
+      - name: Build MSI (self-contained)
+        run: >
+          dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
+          -c Release
+          -p:PublishDir=${{ github.workspace }}/publish-sc/
+          -p:ProductVersion=${{ env.PRODUCT_VERSION }}
+          -p:SelfContained=true
+
+      - name: Build MSI (framework-dependent)
+        run: >
+          dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
+          -c Release
+          -p:PublishDir=${{ github.workspace }}/publish-fd/
+          -p:ProductVersion=${{ env.PRODUCT_VERSION }}
+          -p:SelfContained=false
+
+      # Code signing placeholder — sign MSI files after build
+      # - name: Sign MSI (self-contained)
+      #   run: >
+      #     signtool sign /f "${{ runner.temp }}\cert.pfx"
+      #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
+      #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
+      #     setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
+      #
+      # - name: Sign MSI (framework-dependent)
+      #   run: >
+      #     signtool sign /f "${{ runner.temp }}\cert.pfx"
+      #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
+      #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
+      #     setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
+      #
+      # - name: Clean up certificate
+      #   if: always()
+      #   run: Remove-Item "${{ runner.temp }}\cert.pfx" -Force -ErrorAction SilentlyContinue
+
+      # Upload MSI artifacts
+      - name: Upload MSI (self-contained)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained
+          path: setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
+
+      - name: Upload MSI (framework-dependent)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64
+          path: setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi

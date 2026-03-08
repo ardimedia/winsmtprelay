@@ -1,0 +1,83 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Fragment>
+
+    <!-- Windows Service registration -->
+    <Component Id="ServiceComponent" Directory="INSTALLFOLDER">
+      <File Id="ServiceExe" Source="$(var.PublishDir)\WinSmtpRelay.Service.exe" KeyPath="yes" />
+
+      <ServiceInstall Id="WinSmtpRelayService"
+                      Name="WinSmtpRelay"
+                      DisplayName="WinSmtpRelay SMTP Relay"
+                      Description="Open-source SMTP relay service for Windows — routes and delivers email via store-and-forward queue."
+                      Type="ownProcess"
+                      Start="auto"
+                      Account="NT AUTHORITY\NetworkService"
+                      ErrorControl="normal">
+        <util:ServiceConfig FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="60"
+                            ResetPeriodInDays="1" />
+      </ServiceInstall>
+
+      <ServiceControl Id="StopWinSmtpRelay"
+                      Name="WinSmtpRelay"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+
+    <!-- Configuration file — preserved on upgrade, kept on uninstall -->
+    <Component Id="ConfigComponent" Directory="INSTALLFOLDER" NeverOverwrite="yes" Permanent="yes">
+      <File Id="AppSettings" Source="$(var.PublishDir)\appsettings.json" KeyPath="yes" />
+    </Component>
+
+    <!-- Windows Firewall inbound rules for SMTP and Admin UI -->
+    <Component Id="FirewallRules" Directory="INSTALLFOLDER" Guid="a1e7c3f9-2d4b-4e8a-9f6c-5b3d1a0e7f2c">
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\ARDIMEDIA\WinSmtpRelay"
+                     Name="FirewallConfigured"
+                     Type="integer" Value="1" KeyPath="yes" />
+
+      <fw:FirewallException Id="SmtpPort25"
+                            Name="WinSmtpRelay SMTP (25)"
+                            Port="25"
+                            Protocol="tcp"
+                            Scope="any"
+                            Profile="all" />
+
+      <fw:FirewallException Id="SmtpPort587"
+                            Name="WinSmtpRelay Submission (587)"
+                            Port="587"
+                            Protocol="tcp"
+                            Scope="any"
+                            Profile="all" />
+
+      <fw:FirewallException Id="SmtpPort465"
+                            Name="WinSmtpRelay SMTPS (465)"
+                            Port="465"
+                            Protocol="tcp"
+                            Scope="any"
+                            Profile="all" />
+
+      <fw:FirewallException Id="AdminUiPort8025"
+                            Name="WinSmtpRelay Admin UI (8025)"
+                            Port="8025"
+                            Protocol="tcp"
+                            Scope="any"
+                            Profile="all" />
+    </Component>
+
+    <!-- Grant NetworkService write access for SQLite database -->
+    <Component Id="InstallDirPermissions" Directory="INSTALLFOLDER" Guid="b2f8d4e0-3c5a-4f9b-a0d7-6c4e2b1f8a3d">
+      <CreateFolder>
+        <util:PermissionEx User="NT AUTHORITY\NetworkService" GenericAll="yes" />
+      </CreateFolder>
+    </Component>
+
+  </Fragment>
+
+</Wix>

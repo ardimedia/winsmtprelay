@@ -16,4 +16,7 @@
     <Project Path="tests/WinSmtpRelay.Security.Tests/WinSmtpRelay.Security.Tests.csproj" />
     <Project Path="tests/WinSmtpRelay.SmtpListener.Tests/WinSmtpRelay.SmtpListener.Tests.csproj" />
   </Folder>
+  <Folder Name="/setup/">
+    <Project Path="setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj" />
+  </Folder>
 </Solution>

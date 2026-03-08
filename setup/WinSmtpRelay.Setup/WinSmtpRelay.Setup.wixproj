@@ -1,0 +1,31 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <SuppressIces>ICE61</SuppressIces>
+    <DefaultProductVersion>1.0.0</DefaultProductVersion>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">$(DefaultProductVersion)</ProductVersion>
+    <OutputName Condition="'$(SelfContained)' == 'true'">WinSmtpRelay-$(ProductVersion)-x64-self-contained</OutputName>
+    <OutputName Condition="'$(SelfContained)' != 'true'">WinSmtpRelay-$(ProductVersion)-x64</OutputName>
+    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained)</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishDir)' == ''">
+    <PublishDir>..\..\publish\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.*" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.*" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <HarvestDirectory Include="$(PublishDir)"
+                      ComponentGroupName="PublishedFiles"
+                      DirectoryRef="INSTALLFOLDER"
+                      SuppressRootDirectory="true"
+                      ExcludeFile="appsettings.json;appsettings.Development.json" />
+  </ItemGroup>
+
+</Project>

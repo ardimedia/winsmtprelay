@@ -1,0 +1,49 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="WinSmtpRelay $(var.ProductVersion) Beta 1"
+           Manufacturer="ARDIMEDIA"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="2cbb38d8-5035-40db-b30b-0e55f24ec496"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <SummaryInformation Description="WinSmtpRelay — Open-Source SMTP Relay for Windows" />
+
+    <MajorUpgrade Schedule="afterInstallExecute"
+                  DowngradeErrorMessage="A newer version of WinSmtpRelay is already installed. Please uninstall it first."
+                  AllowSameVersionUpgrades="yes" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+
+    <!-- .NET 10 runtime check for framework-dependent variant -->
+    <?if $(var.SelfContained) = false ?>
+    <Launch Condition="Installed OR NETCORERUNTIME10"
+            Message="WinSmtpRelay requires the .NET 10 Runtime (x64). Please download and install it from https://dotnet.microsoft.com/download/dotnet/10.0 and run this installer again." />
+    <?endif?>
+
+  </Package>
+
+  <!-- Directory structure -->
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="WinSmtpRelay" />
+    </StandardDirectory>
+  </Fragment>
+
+  <!-- Single feature containing all components -->
+  <Fragment>
+    <Feature Id="Complete" Title="WinSmtpRelay" Level="1">
+      <ComponentGroupRef Id="PublishedFiles" />
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="ConfigComponent" />
+      <ComponentRef Id="FirewallRules" />
+      <ComponentRef Id="InstallDirPermissions" />
+    </Feature>
+  </Fragment>
+
+</Wix>
