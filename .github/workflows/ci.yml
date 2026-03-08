@@ -11,9 +11,6 @@ jobs:
   build:
     runs-on: windows-latest
 
-    env:
-      PRODUCT_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '1.0.0' }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -84,7 +81,7 @@ jobs:
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
       #     publish-fd/WinSmtpRelay.Service.exe
 
-      # Build MSI installers
+      # Build MSI installers into separate output directories
       - name: Build MSI (self-contained)
         run: >
           dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj
@@ -92,6 +89,7 @@ jobs:
           -p:PublishDir=${{ github.workspace }}/publish-sc/
           -p:ProductVersion=${{ env.PRODUCT_VERSION }}
           -p:SelfContained=true
+          -p:OutputPath=${{ github.workspace }}/msi-sc/
 
       - name: Build MSI (framework-dependent)
         run: >
@@ -100,6 +98,19 @@ jobs:
           -p:PublishDir=${{ github.workspace }}/publish-fd/
           -p:ProductVersion=${{ env.PRODUCT_VERSION }}
           -p:SelfContained=false
+          -p:OutputPath=${{ github.workspace }}/msi-fd/
+
+      # Rename MSIs from default project name to descriptive filenames
+      - name: Rename MSI files
+        shell: bash
+        run: |
+          mv msi-sc/Release/en-US/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi" || \
+          mv msi-sc/en-US/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi" || \
+          mv msi-sc/WinSmtpRelay.Setup.msi "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi"
+
+          mv msi-fd/Release/en-US/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi" || \
+          mv msi-fd/en-US/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi" || \
+          mv msi-fd/WinSmtpRelay.Setup.msi "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi"
 
       # Code signing placeholder — sign MSI files after build
       # - name: Sign MSI (self-contained)
@@ -107,14 +118,14 @@ jobs:
       #     signtool sign /f "${{ runner.temp }}\cert.pfx"
       #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
-      #     setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
+      #     "msi-sc/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi"
       #
       # - name: Sign MSI (framework-dependent)
       #   run: >
       #     signtool sign /f "${{ runner.temp }}\cert.pfx"
       #     /p "${{ secrets.CODE_SIGNING_PASSWORD }}"
       #     /tr http://timestamp.digicert.com /td sha256 /fd sha256
-      #     setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
+      #     "msi-fd/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi"
       #
       # - name: Clean up certificate
       #   if: always()
@@ -125,13 +136,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained
-          path: setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
+          path: msi-sc/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64-self-contained.msi
 
       - name: Upload MSI (framework-dependent)
         uses: actions/upload-artifact@v4
         with:
           name: WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64
-          path: setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
+          path: msi-fd/WinSmtpRelay-${{ env.PRODUCT_VERSION }}-x64.msi
 
       # Create GitHub Release with MSI assets on tag push
       - name: Create GitHub Release
@@ -149,5 +160,5 @@ jobs:
             --title "WinSmtpRelay $TAG_LABEL" \
             --generate-notes \
             $IS_PRERELEASE \
-            "setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi#WinSmtpRelay ${TAG_LABEL} (x64, self-contained)" \
-            "setup/WinSmtpRelay.Setup/bin/Release/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi#WinSmtpRelay ${TAG_LABEL} (x64, requires .NET 10)"
+            "msi-sc/WinSmtpRelay-${PRODUCT_VERSION}-x64-self-contained.msi#WinSmtpRelay ${TAG_LABEL} (x64, self-contained)" \
+            "msi-fd/WinSmtpRelay-${PRODUCT_VERSION}-x64.msi#WinSmtpRelay ${TAG_LABEL} (x64, requires .NET 10)"
