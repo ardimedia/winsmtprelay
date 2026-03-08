@@ -80,6 +80,7 @@ public class DeliveryWorker(
         var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
 
         await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivering, cancellationToken: cancellationToken);
+        _ = activityNotifier.NotifyQueueChangedAsync();
 
         try
         {
@@ -99,6 +100,7 @@ public class DeliveryWorker(
                 if (!result.Accept)
                 {
                     await queue.UpdateStatusAsync(message.Id, MessageStatus.Bounced, $"Filtered: {result.RejectReason}", cancellationToken);
+                    _ = activityNotifier.NotifyQueueChangedAsync();
                     logger.LogInformation("Message {MessageId} rejected by filter: {Reason}",
                         message.MessageId, result.RejectReason);
 
@@ -122,6 +124,7 @@ public class DeliveryWorker(
 
             var deliveryResults = await deliveryService.DeliverAsync(message, cancellationToken);
             await queue.UpdateStatusAsync(message.Id, MessageStatus.Delivered, cancellationToken: cancellationToken);
+            _ = activityNotifier.NotifyQueueChangedAsync();
 
             // Log per-recipient delivery results and broadcast via SignalR
             foreach (var dr in deliveryResults)
@@ -186,6 +189,7 @@ public class DeliveryWorker(
                 await queue.UpdateStatusAsync(message.Id, MessageStatus.Queued, ex.Message, cancellationToken);
                 await queue.SetRetryAsync(message.Id, message.RetryCount, nextRetry.Value, cancellationToken);
             }
+            _ = activityNotifier.NotifyQueueChangedAsync();
         }
     }
 

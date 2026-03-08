@@ -1,7 +1,10 @@
 @page "/queue"
+@using Microsoft.AspNetCore.SignalR.Client
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -21,11 +24,11 @@
         <p>Queued, pending, and failed messages</p>
     </div>
     <div style="display:flex;gap:0.5rem;">
-        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
-            <LucideIcon Name="info" /> About this page
-        </BbButton>
         <BbButton Variant="ButtonVariant.Default" @onclick="RefreshAsync">
             <LucideIcon Name="refresh-cw" /> Refresh
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+            <LucideIcon Name="info" /> About this page
         </BbButton>
     </div>
 </div>
@@ -169,14 +172,41 @@ else
     private bool loaded;
     private bool showDeleteConfirm;
     private long deleteTargetId;
+    private HubConnection? hubConnection;
+    private bool _disposed;
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+
+        var hubUrl = Navigation.ToAbsoluteUri("/hubs/activity");
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On("QueueChanged", () => RefreshInBackground());
+        hubConnection.On<dynamic>("MessageReceived", _ => RefreshInBackground());
+
+        try { await hubConnection.StartAsync(); }
+        catch { /* hub unavailable — manual refresh still works */ }
+    }
+
+    private void RefreshInBackground()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshAsync();
+            StateHasChanged();
+        });
+    }
 
     private async Task RefreshAsync()
     {
         using var scope = ScopeFactory.CreateScope();
         var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
-        messages = await queue.GetPendingAsync(100);
+        messages = await queue.GetNonDeliveredAsync(100);
         statusMessage = null;
         loaded = true;
     }
@@ -216,8 +246,16 @@ else
     private static string GetBadgeCss(MessageStatus status) => status switch
     {
         MessageStatus.Delivered => "badge-success",
+        MessageStatus.Delivering => "badge-warning",
         MessageStatus.Failed or MessageStatus.Bounced => "badge-error",
         MessageStatus.Queued => "badge-muted",
         _ => "badge-muted"
     };
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
 }

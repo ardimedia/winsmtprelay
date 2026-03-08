@@ -46,4 +46,9 @@ public class ActivityNotifier(IHubContext<ActivityHub> hub) : IActivityNotifier
             TimestampUtc = DateTime.UtcNow
         });
     }
+
+    public async Task NotifyQueueChangedAsync()
+    {
+        await hub.Clients.All.SendAsync("QueueChanged");
+    }
 }

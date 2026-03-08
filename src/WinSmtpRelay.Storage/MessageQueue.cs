@@ -65,4 +65,13 @@ public class MessageQueue(RelayDbContext db) : IMessageQueue
             .Take(maxCount)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<QueuedMessage>> GetNonDeliveredAsync(int maxCount, CancellationToken cancellationToken = default)
+    {
+        return await db.QueuedMessages
+            .Where(m => m.Status != MessageStatus.Delivered)
+            .OrderByDescending(m => m.CreatedUtc)
+            .Take(maxCount)
+            .ToListAsync(cancellationToken);
+    }
 }
