@@ -83,14 +83,10 @@
                      KeyPath="yes" />
     </Component>
 
-    <!-- Grant NetworkService modify access for SQLite database -->
+    <!-- Grant NetworkService full access for SQLite database (needs create, write, lock, WAL journals) -->
     <Component Id="InstallDirPermissions" Directory="INSTALLFOLDER" Guid="b2f8d4e0-3c5a-4f9b-a0d7-6c4e2b1f8a3d">
       <CreateFolder>
-        <util:PermissionEx User="NT AUTHORITY\NetworkService"
-                          GenericRead="yes"
-                          GenericWrite="yes"
-                          GenericExecute="yes"
-                          Delete="yes" />
+        <util:PermissionEx User="NT AUTHORITY\NetworkService" GenericAll="yes" />
       </CreateFolder>
     </Component>
 
