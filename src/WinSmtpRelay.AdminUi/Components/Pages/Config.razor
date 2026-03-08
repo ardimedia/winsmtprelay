@@ -23,10 +23,49 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Configuration</h1>
-    <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Configuration</h1>
+        <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Configuration</BbDialogTitle>
+            <BbDialogDescription>Understanding the relay settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                This page shows a <strong>read-only</strong> view of the current WinSmtpRelay configuration,
+                loaded from <code>appsettings.json</code>. To change settings, edit the file directly and
+                restart the Windows service.
+            </p>
+            <h4 style="margin-top:1rem;">Configuration tabs</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Listener</strong> &mdash; SMTP endpoints (addresses, ports, TLS mode, authentication), max message size, allowed networks, and the optional pickup folder for file-based message submission.</li>
+                <li><strong>Delivery</strong> &mdash; outbound settings: smart host, concurrent delivery limit, retry intervals, max retry window, opportunistic TLS, and per-domain routing rules.</li>
+                <li><strong>Security</strong> &mdash; TLS certificate configuration, DKIM signing domains, and rate-limiting thresholds (per-IP connections, per-sender messages, failed-auth banning).</li>
+                <li><strong>Advanced</strong> &mdash; message filter rules (header/sender rewrites), webhook endpoints, backup MX settings, and Admin UI bind address.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Configuration file</h4>
+            <p>
+                The configuration file is located alongside the service executable, typically at
+                <code>C:\Program Files\WinSmtpRelay\appsettings.json</code>. Changes require a service restart
+                to take effect.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
 
 <BbTabs DefaultValue="listener">
     <BbTabsList>
@@ -296,3 +335,7 @@
         </BbCard>
     </BbTabsContent>
 </BbTabs>
+
+@code {
+    private bool showHelp;
+}

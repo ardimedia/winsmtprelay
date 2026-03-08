@@ -14,9 +14,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Software Update</h1>
-    <p>Check for new WinSmtpRelay releases on GitHub</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Software Update</h1>
+        <p>Check for new WinSmtpRelay releases on GitHub</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
 
 <BbCard Class="mb-1">
@@ -105,7 +110,45 @@
     </BbCardContent>
 </BbCard>
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Software Update</BbDialogTitle>
+            <BbDialogDescription>Checking for new releases</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                This page checks the <strong>GitHub Releases</strong> API for newer versions of WinSmtpRelay.
+                No data is sent &mdash; the relay simply fetches the latest release metadata from the public repository.
+            </p>
+            <h4 style="margin-top:1rem;">How it works</h4>
+            <ol style="padding-left:1.25rem;">
+                <li>Click <strong>Check for Updates</strong> to query the GitHub API.</li>
+                <li>The current running version is compared against the latest published release tag.</li>
+                <li>If a newer version is available, an <strong>Update Available</strong> badge is shown along with download links and release notes.</li>
+            </ol>
+            <h4 style="margin-top:1rem;">Updating</h4>
+            <p>
+                WinSmtpRelay does not auto-update. Download the new release, stop the Windows service,
+                replace the files, and restart the service. Your <code>appsettings.json</code> and SQLite
+                database are preserved across updates.
+            </p>
+            <h4 style="margin-top:1rem;">Network requirements</h4>
+            <p>
+                The update check requires outbound HTTPS access to <code>api.github.com</code>.
+                If the server has no internet access, the check will fail gracefully with an error message.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private string currentVersion = typeof(Update).Assembly.GetName().Version?.ToString() ?? "0.0.0";
     private bool isChecking;
     private string? errorMessage;

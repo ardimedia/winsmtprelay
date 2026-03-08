@@ -20,9 +20,14 @@
         <h1>Message Queue</h1>
         <p>Queued, pending, and failed messages</p>
     </div>
-    <BbButton Variant="ButtonVariant.Default" @onclick="RefreshAsync">
-        <LucideIcon Name="refresh-cw" /> Refresh
-    </BbButton>
+    <div style="display:flex;gap:0.5rem;">
+        <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+            <LucideIcon Name="info" /> About this page
+        </BbButton>
+        <BbButton Variant="ButtonVariant.Default" @onclick="RefreshAsync">
+            <LucideIcon Name="refresh-cw" /> Refresh
+        </BbButton>
+    </div>
 </div>
 
 @if (!loaded)
@@ -119,7 +124,46 @@ else
     </BbAlertDialogContent>
 </BbAlertDialog>
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About the Message Queue</BbDialogTitle>
+            <BbDialogDescription>Understanding message processing</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                Every email submitted to WinSmtpRelay is first stored in a persistent queue (SQLite database)
+                before delivery is attempted. This page shows messages that are waiting, being delivered, or have failed.
+            </p>
+            <h4 style="margin-top:1rem;">Message lifecycle</h4>
+            <ol style="padding-left:1.25rem;">
+                <li><strong>Queued</strong> &mdash; message received and waiting for the delivery worker to pick it up.</li>
+                <li><strong>Delivering</strong> &mdash; currently being sent to the recipient's mail server.</li>
+                <li><strong>Delivered</strong> &mdash; successfully accepted by the remote server (disappears from this view).</li>
+                <li><strong>Failed/Bounced</strong> &mdash; delivery failed permanently after all retry attempts.</li>
+            </ol>
+            <h4 style="margin-top:1rem;">Actions</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Retry</strong> &mdash; re-queue a failed/bounced message for another delivery attempt.</li>
+                <li><strong>Delete</strong> &mdash; permanently remove a message from the queue.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Retries</h4>
+            <p>
+                The relay automatically retries delivery on temporary failures using configurable intervals
+                (e.g., 1, 5, 15, 30, 60 minutes). After the maximum retry window (default 48 hours),
+                the message is bounced.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private IReadOnlyList<QueuedMessage> messages = [];
     private string? statusMessage;
     private bool loaded;

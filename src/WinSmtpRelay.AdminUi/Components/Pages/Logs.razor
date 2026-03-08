@@ -14,9 +14,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Event Log</h1>
-    <p>Windows Event Log entries for WinSmtpRelay</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Event Log</h1>
+        <p>Windows Event Log entries for WinSmtpRelay</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
 
 <div class="search-bar">
@@ -98,7 +103,45 @@
     </BbAlertDialogContent>
 </BbAlertDialog>
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About the Event Log</BbDialogTitle>
+            <BbDialogDescription>Windows Event Log viewer for WinSmtpRelay</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                This page reads entries from the <strong>Windows Event Log</strong> (Application log) written by
+                the WinSmtpRelay service. It provides a convenient way to inspect service-level events without
+                opening the Windows Event Viewer.
+            </p>
+            <h4 style="margin-top:1rem;">Event levels</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Information</strong> &mdash; normal operations: service start/stop, configuration loaded, delivery summaries.</li>
+                <li><strong>Warning</strong> &mdash; non-critical issues: temporary delivery failures, rate-limit hits, certificate expiry warnings.</li>
+                <li><strong>Error</strong> &mdash; critical failures: unhandled exceptions, database errors, TLS handshake failures.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Filtering &amp; limits</h4>
+            <p>
+                Use the level dropdown to show only a specific severity. The entry count field limits how many
+                entries are displayed (default 100). Click <strong>Refresh</strong> to reload from the Event Log.
+            </p>
+            <h4 style="margin-top:1rem;">Clearing the log</h4>
+            <p>
+                The <strong>Clear Log</strong> button permanently removes all WinSmtpRelay entries from the
+                Windows Application Event Log. This requires the service to run with administrator privileges.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private List<LogEntry> logEntries = [];
     private string selectedLevel = "";
     private string maxEntriesStr = "100";

@@ -15,9 +15,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Live Activity</h1>
-    <p>Real-time feed of SMTP connections, messages, and deliveries</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Live Activity</h1>
+        <p>Real-time feed of SMTP connections, messages, and deliveries</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
 
 <div style="margin-bottom:1rem;display:flex;align-items:center;gap:1rem;">
@@ -45,7 +50,42 @@
     }
 </div>
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Live Activity</BbDialogTitle>
+            <BbDialogDescription>Real-time SMTP event monitoring</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                This page shows a real-time feed of everything happening on the SMTP relay,
+                streamed via SignalR (WebSocket).
+            </p>
+            <h4 style="margin-top:1rem;">Event types</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>&gt;&gt;&gt; Message Received</strong> &mdash; an application submitted an email to the relay. Shows sender, recipients, and size.</li>
+                <li><strong>&lt;&lt;&lt; Delivery Attempt</strong> &mdash; the relay tried to deliver a message. Shows the SMTP status code (250 = success) and the remote server used.</li>
+                <li><strong>... SMTP Connection</strong> &mdash; a client connected to or disconnected from the SMTP listener.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Connection status</h4>
+            <p>
+                The badge at the top shows whether the browser is connected to the server's SignalR hub.
+                If disconnected, the feed will pause and automatically reconnect.
+            </p>
+            <p>
+                The feed holds up to 200 events. Use <strong>Clear</strong> to reset.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private HubConnection? hubConnection;
     private bool isConnected;
     private bool _disposed;

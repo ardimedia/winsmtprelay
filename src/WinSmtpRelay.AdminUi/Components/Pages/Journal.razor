@@ -17,9 +17,14 @@
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
-<div class="page-header">
-    <h1>Message Journal</h1>
-    <p>Per-message delivery audit trail</p>
+<div class="page-header page-header-row">
+    <div>
+        <h1>Message Journal</h1>
+        <p>Per-message delivery audit trail</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About this page
+    </BbButton>
 </div>
 
 <div class="search-bar">
@@ -99,7 +104,48 @@ else
     }
 }
 
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About the Message Journal</BbDialogTitle>
+            <BbDialogDescription>Per-recipient delivery audit trail</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>
+                The journal records every delivery attempt for every recipient. Unlike the queue (which tracks
+                messages), the journal tracks <strong>individual deliveries</strong> &mdash; one message sent to
+                three recipients produces three journal entries.
+            </p>
+            <h4 style="margin-top:1rem;">What each column means</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Time (UTC)</strong> &mdash; when the delivery attempt was made.</li>
+                <li><strong>Msg ID</strong> &mdash; links back to the queued message by its internal queue ID.</li>
+                <li><strong>Recipient</strong> &mdash; the email address this attempt targeted.</li>
+                <li><strong>Status</strong> &mdash; the SMTP status code returned by the remote server (250 = success, 4xx = temporary failure, 5xx = permanent failure).</li>
+                <li><strong>Remote Server</strong> &mdash; the MX host or smart host that handled the delivery.</li>
+                <li><strong>Details</strong> &mdash; the full status message from the remote server. Hover for the complete text.</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Searching</h4>
+            <p>
+                Use the search bar to filter by recipient address, status code, status message, or remote server name.
+                Results are paginated (50 per page).
+            </p>
+            <h4 style="margin-top:1rem;">Retention</h4>
+            <p>
+                Journal entries are stored permanently in the SQLite database. They are never automatically purged,
+                giving you a complete audit trail of all delivery activity.
+            </p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
 @code {
+    private bool showHelp;
     private List<DeliveryLog> logs = [];
     private string searchTerm = "";
     private int pageSize = 50;
