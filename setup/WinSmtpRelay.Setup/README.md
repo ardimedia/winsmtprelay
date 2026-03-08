@@ -136,3 +136,26 @@ Output: `setup/WinSmtpRelay.Setup/bin/Release/*.msi`
 
 The `UpgradeCode` GUID (`2cbb38d8-5035-40db-b30b-0e55f24ec496`) in `Package.wxs` must **never change**. It is the permanent identity that allows MSI upgrades to detect and replace previous installations.
 
+## Verification checklist
+
+After building locally, verify:
+
+```powershell
+# Check MSI size (self-contained should be 60-120 MB, framework-dependent 5-15 MB)
+Get-Item setup\WinSmtpRelay.Setup\bin\Release\*.msi | Select-Object Name, @{N='MB';E={[math]::Round($_.Length/1MB,1)}}
+
+# Check MSI contents (should list hundreds of files for self-contained)
+msiexec /a "setup\WinSmtpRelay.Setup\bin\Release\WinSmtpRelay.Setup.msi" /qn TARGETDIR=C:\temp\msi-check
+Get-ChildItem C:\temp\msi-check -Recurse -File | Measure-Object
+Remove-Item C:\temp\msi-check -Recurse -Force
+```
+
+Install/upgrade tests (on a VM or test machine):
+
+1. **Fresh install (self-contained)** — service starts, Admin UI on `:8025`, firewall rules created
+2. **Fresh install (framework-dependent)** — same, but requires .NET 10 runtime
+3. **FD on machine without .NET 10** — installer shows helpful error message
+4. **Upgrade** — edit `appsettings.json`, install newer MSI, verify config preserved
+5. **Cross-variant upgrade** — install SC, then upgrade to FD (and vice versa) — seamless replacement
+6. **Uninstall** — service removed, firewall rules removed, `appsettings.json` preserved
+

@@ -7,7 +7,10 @@
     <!-- ProductVersion reads from Directory.Build.props $(Version), overridable via -p:ProductVersion -->
     <ProductVersion Condition="'$(ProductVersion)' == ''">$(Version)</ProductVersion>
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
-    <DefineConstants>ProductVersion=$(ProductVersion);SelfContained=$(SelfContained);HarvestPath=$(HarvestPath)</DefineConstants>
+    <!-- VersionLabel: e.g. "1.0.0-beta4" or "1.0.0" for stable -->
+    <VersionLabel Condition="'$(VersionSuffix)' != ''">$(ProductVersion)-$(VersionSuffix)</VersionLabel>
+    <VersionLabel Condition="'$(VersionSuffix)' == ''">$(ProductVersion)</VersionLabel>
+    <DefineConstants>ProductVersion=$(ProductVersion);VersionLabel=$(VersionLabel);VersionSuffix=$(VersionSuffix);SelfContained=$(SelfContained);HarvestPath=$(HarvestPath)</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(HarvestPath)' == ''">

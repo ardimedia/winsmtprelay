@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
-  <Package Name="WinSmtpRelay $(var.ProductVersion) Beta 1"
+  <Package Name="WinSmtpRelay $(var.VersionLabel)"
            Manufacturer="ARDIMEDIA"
            Version="$(var.ProductVersion)"
            UpgradeCode="2cbb38d8-5035-40db-b30b-0e55f24ec496"
@@ -22,6 +22,13 @@
 
     <!-- .NET 10 runtime check for framework-dependent variant -->
     <?if $(var.SelfContained) = false ?>
+    <Property Id="NETCORERUNTIME10">
+      <RegistrySearch Id="NetCore10Search"
+                      Root="HKLM"
+                      Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedhost"
+                      Name="Version"
+                      Type="raw" />
+    </Property>
     <Launch Condition="Installed OR NETCORERUNTIME10"
             Message="WinSmtpRelay requires the .NET 10 Runtime (x64). Please download and install it from https://dotnet.microsoft.com/download/dotnet/10.0 and run this installer again." />
     <?endif?>
