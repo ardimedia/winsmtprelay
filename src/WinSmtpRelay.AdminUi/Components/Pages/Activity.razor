@@ -3,20 +3,34 @@
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
+<BbBreadcrumb>
+    <BbBreadcrumbList AutoSeparator="true">
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Live Activity</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <h2>Live Activity</h2>
 <p class="text-muted">Real-time feed of SMTP connections, messages, and deliveries</p>
 
-<div style="margin-bottom:1rem;">
-    <span class="badge @(isConnected ? "badge-success" : "badge-danger")">
+<div style="margin-bottom:1rem;display:flex;align-items:center;gap:1rem;">
+    <BbBadge Variant="@(isConnected ? BadgeVariant.Default : BadgeVariant.Destructive)">
         @(isConnected ? "Connected" : "Disconnected")
-    </span>
-    <button class="btn btn-sm" @onclick="ClearFeed" style="margin-left:1rem;">Clear</button>
+    </BbBadge>
+    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Outline" @onclick="ClearFeed">
+        <LucideIcon Name="eraser" />
+        Clear
+    </BbButton>
 </div>
 
 <div class="activity-feed">
     @if (events.Count == 0)
     {
-        <p style="text-align:center;color:var(--text-muted);">Waiting for activity...</p>
+        <p style="text-align:center;" class="text-muted">Waiting for activity...</p>
     }
     @foreach (var evt in events)
     {
@@ -31,6 +45,7 @@
 @code {
     private HubConnection? hubConnection;
     private bool isConnected;
+    private bool _disposed;
     private readonly List<ActivityEvent> events = [];
     private const int MaxEvents = 200;
 
@@ -59,8 +74,8 @@
             AddEvent("...", $"SMTP {data.GetProperty("eventType")} from {data.GetProperty("sourceIp")}", "activity-connection");
         });
 
-        hubConnection.Closed += _ => { isConnected = false; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
-        hubConnection.Reconnected += _ => { isConnected = true; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        hubConnection.Closed += _ => { isConnected = false; if (!_disposed) InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        hubConnection.Reconnected += _ => { isConnected = true; if (!_disposed) InvokeAsync(StateHasChanged); return Task.CompletedTask; };
 
         try
         {
@@ -75,6 +90,7 @@
 
     private void AddEvent(string icon, string text, string cssClass)
     {
+        if (_disposed) return;
         events.Insert(0, new ActivityEvent(DateTime.Now, icon, text, cssClass));
         if (events.Count > MaxEvents)
             events.RemoveAt(events.Count - 1);
@@ -85,6 +101,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         if (hubConnection is not null)
             await hubConnection.DisposeAsync();
     }

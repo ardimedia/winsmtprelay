@@ -2,51 +2,105 @@
 @using System.Diagnostics
 @using System.Diagnostics.Eventing.Reader
 
+<BbBreadcrumb>
+    <BbBreadcrumbList AutoSeparator="true">
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Event Log</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <h2>Log Viewer</h2>
 <p class="text-muted">Windows Event Log entries for WinSmtpRelay</p>
 
 <div class="search-bar">
-    <select @bind="selectedLevel">
+    <BbNativeSelect @bind-Value="selectedLevel">
         <option value="">All Levels</option>
         <option value="Information">Information</option>
         <option value="Warning">Warning</option>
         <option value="Error">Error</option>
-    </select>
-    <input type="number" @bind="maxEntries" style="width:80px;" title="Max entries" />
-    <button class="btn" @onclick="LoadLogs">Refresh</button>
-    <button class="btn btn-danger" @onclick="ClearLogs" disabled="@(logEntries.Count == 0)">Clear Log</button>
+    </BbNativeSelect>
+    <div style="width:80px;"><BbInput Type="InputType.Number" @bind-Value="maxEntriesStr" /></div>
+    <BbButton Variant="ButtonVariant.Secondary" @onclick="LoadLogs">
+        <LucideIcon Name="refresh-cw" />
+        Refresh
+    </BbButton>
+    <BbButton Variant="ButtonVariant.Destructive" @onclick="() => showClearConfirm = true" Disabled="@(logEntries.Count == 0)">
+        <LucideIcon Name="eraser" />
+        Clear Log
+    </BbButton>
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Time</th>
-            <th>Level</th>
-            <th>Source</th>
-            <th>Message</th>
-        </tr>
-    </thead>
-    <tbody>
+<BbTable Data="@logEntries">
+    <BbTableHeader>
+        <BbTableRow TData="LogEntry">
+            <BbTableHeaderCell TData="LogEntry">Time</BbTableHeaderCell>
+            <BbTableHeaderCell TData="LogEntry">Level</BbTableHeaderCell>
+            <BbTableHeaderCell TData="LogEntry">Source</BbTableHeaderCell>
+            <BbTableHeaderCell TData="LogEntry">Message</BbTableHeaderCell>
+        </BbTableRow>
+    </BbTableHeader>
+    <BbTableBody>
         @if (logEntries.Count == 0)
         {
-            <tr><td colspan="4" style="text-align:center;">No log entries found. The Windows Event Log source 'WinSmtpRelay' may not be registered.</td></tr>
+            <BbTableRow TData="LogEntry">
+                <BbTableCell colspan="4" style="text-align:center;">No log entries found. The Windows Event Log source 'WinSmtpRelay' may not be registered.</BbTableCell>
+            </BbTableRow>
         }
         @foreach (var entry in logEntries)
         {
-            <tr class="@GetRowClass(entry.Level)">
-                <td style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                <td><span class="badge @GetBadgeClass(entry.Level)">@entry.Level</span></td>
-                <td>@entry.Source</td>
-                <td>@Truncate(entry.Message, 120)</td>
-            </tr>
+            <BbTableRow Item="@entry" class="@GetRowClass(entry.Level)">
+                <BbTableCell style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
+                <BbTableCell><BbBadge Variant="@GetBadgeVariant(entry.Level)">@entry.Level</BbBadge></BbTableCell>
+                <BbTableCell>@entry.Source</BbTableCell>
+                <BbTableCell>
+                    @if (entry.Message.Length > 120)
+                    {
+                        <BbTooltip>
+                            <BbTooltipTrigger>
+                                <span>@Truncate(entry.Message, 120)</span>
+                            </BbTooltipTrigger>
+                            <BbTooltipContent>
+                                <div style="max-width:400px;white-space:pre-wrap;">@entry.Message</div>
+                            </BbTooltipContent>
+                        </BbTooltip>
+                    }
+                    else
+                    {
+                        @entry.Message
+                    }
+                </BbTableCell>
+            </BbTableRow>
         }
-    </tbody>
-</table>
+    </BbTableBody>
+</BbTable>
+
+<BbAlertDialog @bind-Open="showClearConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Clear Event Log</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will permanently clear all WinSmtpRelay entries from the Windows Event Log. This action cannot be undone.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmClearLogs">Clear</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
 
 @code {
     private List<LogEntry> logEntries = [];
     private string selectedLevel = "";
-    private int maxEntries = 100;
+    private string maxEntriesStr = "100";
+    private bool showClearConfirm;
+    private int maxEntries => int.TryParse(maxEntriesStr, out var v) ? v : 100;
 
     protected override void OnInitialized()
     {
@@ -100,6 +154,12 @@
         }
     }
 
+    private void ConfirmClearLogs()
+    {
+        ClearLogs();
+        showClearConfirm = false;
+    }
+
     private void ClearLogs()
     {
         try
@@ -127,11 +187,11 @@
         _ => ""
     };
 
-    private static string GetBadgeClass(string level) => level switch
+    private static BadgeVariant GetBadgeVariant(string level) => level switch
     {
-        "Error" => "badge-danger",
-        "Warning" => "badge-warning",
-        _ => "badge-success"
+        "Error" => BadgeVariant.Destructive,
+        "Warning" => BadgeVariant.Outline,
+        _ => BadgeVariant.Default
     };
 
     private static string Truncate(string text, int maxLen) =>

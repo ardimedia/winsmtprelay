@@ -2,67 +2,105 @@
 @using System.Text.Json
 @inject IHttpClientFactory HttpClientFactory
 
+<BbBreadcrumb>
+    <BbBreadcrumbList AutoSeparator="true">
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Update</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <h2>Software Update</h2>
 <p class="text-muted">Check for new WinSmtpRelay releases on GitHub</p>
 
-<div class="card" style="margin-bottom:1rem;">
-    <h3>Current Version</h3>
-    <p><strong>@currentVersion</strong></p>
-</div>
+<BbCard Class="mb-1">
+    <BbCardHeader><BbCardTitle>Current Version</BbCardTitle></BbCardHeader>
+    <BbCardContent>
+        <p><strong>@currentVersion</strong></p>
+    </BbCardContent>
+</BbCard>
 
-<div class="card">
-    <h3>Latest Release</h3>
-
-    @if (isChecking)
-    {
-        <p>Checking for updates...</p>
-    }
-    else if (errorMessage is not null)
-    {
-        <p class="text-danger">@errorMessage</p>
-        <button class="btn" @onclick="CheckForUpdates">Retry</button>
-    }
-    else if (latestRelease is not null)
-    {
-        <p>
-            <strong>@latestRelease.TagName</strong>
-            @if (isNewer)
-            {
-                <span class="badge badge-warning" style="margin-left:0.5rem;">Update Available</span>
-            }
-            else
-            {
-                <span class="badge badge-success" style="margin-left:0.5rem;">Up to date</span>
-            }
-        </p>
-        <p>@latestRelease.Name</p>
-        <p class="text-muted">Published: @latestRelease.PublishedAt?.ToString("yyyy-MM-dd HH:mm")</p>
-
-        @if (latestRelease.Assets.Count > 0)
+<BbCard>
+    <BbCardHeader><BbCardTitle>Latest Release</BbCardTitle></BbCardHeader>
+    <BbCardContent>
+        @if (isChecking)
         {
-            <h4>Downloads</h4>
-            <ul>
-                @foreach (var asset in latestRelease.Assets)
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <BbSpinner />
+                <span class="text-muted">Checking for updates...</span>
+            </div>
+        }
+        else if (errorMessage is not null)
+        {
+            <BbAlert>@errorMessage</BbAlert>
+            <BbButton Variant="ButtonVariant.Outline" @onclick="CheckForUpdates" Class="mt-1">
+                <LucideIcon Name="refresh-cw" />
+                Retry
+            </BbButton>
+        }
+        else if (latestRelease is not null)
+        {
+            <p>
+                <strong>@latestRelease.TagName</strong>
+                @if (isNewer)
                 {
-                    <li>
-                        <a href="@asset.DownloadUrl" target="_blank">@asset.Name</a>
-                        <span class="text-muted">(@FormatSize(asset.Size))</span>
-                    </li>
+                    <BbBadge Variant="BadgeVariant.Destructive" Class="ml-1">Update Available</BbBadge>
                 }
-            </ul>
-        }
+                else
+                {
+                    <BbBadge Variant="BadgeVariant.Default" Class="ml-1">Up to date</BbBadge>
+                }
+            </p>
+            <p>@latestRelease.Name</p>
+            <p class="text-muted">Published: @latestRelease.PublishedAt?.ToString("yyyy-MM-dd HH:mm")</p>
 
-        @if (!string.IsNullOrEmpty(latestRelease.Body))
-        {
-            <h4>Release Notes</h4>
-            <pre style="white-space:pre-wrap;font-size:0.85rem;max-height:300px;overflow-y:auto;">@latestRelease.Body</pre>
+            @if (latestRelease.Assets.Count > 0)
+            {
+                <BbSeparator Class="my-1" />
+                <h4>Downloads</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var asset in latestRelease.Assets)
+                        {
+                            <tr>
+                                <td>
+                                    <a href="@asset.DownloadUrl" target="_blank">
+                                        <LucideIcon Name="download" />
+                                        @asset.Name
+                                    </a>
+                                </td>
+                                <td class="text-muted">@FormatSize(asset.Size)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (!string.IsNullOrEmpty(latestRelease.Body))
+            {
+                <BbSeparator Class="my-1" />
+                <h4>Release Notes</h4>
+                <pre style="white-space:pre-wrap;font-size:0.85rem;max-height:300px;overflow-y:auto;">@latestRelease.Body</pre>
+            }
         }
-    }
-    else
-    {
-        <button class="btn" @onclick="CheckForUpdates">Check for Updates</button>
-    }
-</div>
+        else
+        {
+            <BbButton Variant="ButtonVariant.Default" @onclick="CheckForUpdates">
+                <LucideIcon Name="download" />
+                Check for Updates
+            </BbButton>
+        }
+    </BbCardContent>
+</BbCard>
 
 @code {
     private string currentVersion = typeof(Update).Assembly.GetName().Version?.ToString() ?? "0.0.0";

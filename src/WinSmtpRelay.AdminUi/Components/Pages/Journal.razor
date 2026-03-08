@@ -5,58 +5,106 @@
 @using WinSmtpRelay.Storage
 @inject IServiceScopeFactory ScopeFactory
 
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Journal</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <h2>Message Journal</h2>
 <p class="text-muted">Per-message delivery audit trail</p>
 
 <div class="search-bar">
-    <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Search by recipient, message ID, or status..." />
-    <button class="btn" @onclick="LoadLogs">Search</button>
+    <BbInput Type="InputType.Search" @bind-Value="searchTerm" Placeholder="Search by recipient, message ID, or status..." />
+    <BbButton Variant="ButtonVariant.Secondary" @onclick="LoadLogs">
+        <LucideIcon Name="search" />
+        Search
+    </BbButton>
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Time (UTC)</th>
-            <th>Msg ID</th>
-            <th>Recipient</th>
-            <th>Status</th>
-            <th>Remote Server</th>
-            <th>Details</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (logs.Count == 0)
-        {
-            <tr><td colspan="6" style="text-align:center;">No delivery log entries found.</td></tr>
-        }
-        @foreach (var log in logs)
-        {
-            <tr>
-                <td>@log.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                <td title="Queue ID: @log.QueuedMessageId">@log.QueuedMessageId</td>
-                <td>@log.Recipient</td>
-                <td>
-                    <span class="badge @GetStatusClass(log.StatusCode)">@log.StatusCode</span>
-                </td>
-                <td>@(log.RemoteServer ?? "-")</td>
-                <td title="@log.StatusMessage">@Truncate(log.StatusMessage, 60)</td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-@if (logs.Count >= pageSize)
+@if (isLoading)
 {
-    <div style="margin-top:1rem;text-align:center;">
-        <button class="btn" @onclick="LoadMore">Load More</button>
-    </div>
+    <BbSkeleton Class="h-[400px] w-full" />
+}
+else
+{
+    <BbTable Data="@logs">
+        <BbTableHeader>
+            <BbTableRow TData="DeliveryLog">
+                <BbTableHeaderCell TData="DeliveryLog">Time (UTC)</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DeliveryLog">Msg ID</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DeliveryLog">Recipient</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DeliveryLog">Status</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DeliveryLog">Remote Server</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DeliveryLog">Details</BbTableHeaderCell>
+            </BbTableRow>
+        </BbTableHeader>
+        <BbTableBody>
+            @if (logs.Count == 0)
+            {
+                <BbTableRow TData="DeliveryLog">
+                    <BbTableCell colspan="6" style="text-align:center;">No delivery log entries found.</BbTableCell>
+                </BbTableRow>
+            }
+            @foreach (var log in logs)
+            {
+                <BbTableRow Item="@log">
+                    <BbTableCell>@log.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
+                    <BbTableCell title="@($"Queue ID: {log.QueuedMessageId}")">@log.QueuedMessageId</BbTableCell>
+                    <BbTableCell>@log.Recipient</BbTableCell>
+                    <BbTableCell><BbBadge Variant="@GetStatusVariant(log.StatusCode)">@log.StatusCode</BbBadge></BbTableCell>
+                    <BbTableCell>@(log.RemoteServer ?? "-")</BbTableCell>
+                    <BbTableCell>
+                        <BbTooltip>
+                            <BbTooltipTrigger>
+                                <span>@Truncate(log.StatusMessage, 60)</span>
+                            </BbTooltipTrigger>
+                            <BbTooltipContent>@log.StatusMessage</BbTooltipContent>
+                        </BbTooltip>
+                    </BbTableCell>
+                </BbTableRow>
+            }
+        </BbTableBody>
+    </BbTable>
+
+    @if (totalPages > 1)
+    {
+        <div style="margin-top:1rem;">
+            <BbPagination>
+                <BbPaginationContent>
+                    <BbPaginationItem>
+                        <BbPaginationPrevious @onclick="PrevPage" Disabled="@(currentPage <= 1)" />
+                    </BbPaginationItem>
+                    @for (var p = 1; p <= totalPages; p++)
+                    {
+                        var page = p;
+                        <BbPaginationItem>
+                            <BbPaginationLink IsActive="@(page == currentPage)" @onclick="() => GoToPage(page)">@(page)</BbPaginationLink>
+                        </BbPaginationItem>
+                    }
+                    <BbPaginationItem>
+                        <BbPaginationNext @onclick="NextPage" Disabled="@(currentPage >= totalPages)" />
+                    </BbPaginationItem>
+                </BbPaginationContent>
+            </BbPagination>
+        </div>
+    }
 }
 
 @code {
     private List<DeliveryLog> logs = [];
     private string searchTerm = "";
     private int pageSize = 50;
-    private int offset = 0;
+    private int currentPage = 1;
+    private int totalCount = 0;
+    private int totalPages => (int)Math.Ceiling((double)totalCount / pageSize);
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -65,19 +113,38 @@
 
     private async Task LoadLogs()
     {
-        offset = 0;
-        logs.Clear();
+        currentPage = 1;
         await FetchLogs();
     }
 
-    private async Task LoadMore()
+    private async Task GoToPage(int page)
     {
-        offset += pageSize;
+        currentPage = page;
         await FetchLogs();
+    }
+
+    private async Task PrevPage()
+    {
+        if (currentPage > 1)
+        {
+            currentPage--;
+            await FetchLogs();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (currentPage < totalPages)
+        {
+            currentPage++;
+            await FetchLogs();
+        }
     }
 
     private async Task FetchLogs()
     {
+        isLoading = true;
+
         using var scope = ScopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
 
@@ -93,21 +160,24 @@
                 (l.RemoteServer != null && l.RemoteServer.Contains(term)));
         }
 
-        var batch = await query
+        totalCount = await query.CountAsync();
+
+        var skip = (currentPage - 1) * pageSize;
+
+        logs = await query
             .OrderByDescending(l => l.TimestampUtc)
-            .Skip(offset)
+            .Skip(skip)
             .Take(pageSize)
             .ToListAsync();
 
-        logs.AddRange(batch);
+        isLoading = false;
     }
 
-    private static string GetStatusClass(string statusCode) => statusCode switch
+    private static BadgeVariant GetStatusVariant(string statusCode) => statusCode switch
     {
-        "250" => "badge-success",
-        _ when statusCode.StartsWith("4") => "badge-warning",
-        _ when statusCode.StartsWith("5") => "badge-danger",
-        _ => ""
+        "250" => BadgeVariant.Default,
+        _ when statusCode.StartsWith("5") => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
     };
 
     private static string Truncate(string text, int maxLen) =>

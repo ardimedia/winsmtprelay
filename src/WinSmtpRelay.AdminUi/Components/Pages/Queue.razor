@@ -3,61 +3,124 @@
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
 
+<BbBreadcrumb>
+    <BbBreadcrumbList AutoSeparator="true">
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Queue</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <div class="flex justify-between items-center mb-1">
     <h1>Message Queue</h1>
-    <button class="btn btn-primary" @onclick="RefreshAsync">Refresh</button>
+    <BbButton Variant="ButtonVariant.Default" @onclick="RefreshAsync">
+        <LucideIcon Name="refresh-cw" /> Refresh
+    </BbButton>
 </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Message-ID</th>
-            <th>Sender</th>
-            <th>Recipients</th>
-            <th>Size</th>
-            <th>Status</th>
-            <th>Retries</th>
-            <th>Created</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (messages.Count == 0)
-        {
-            <tr><td colspan="9" class="text-muted">Queue is empty</td></tr>
-        }
-        @foreach (var msg in messages)
-        {
-            <tr>
-                <td class="mono">@msg.Id</td>
-                <td class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">@msg.MessageId</td>
-                <td>@msg.Sender</td>
-                <td>@msg.Recipients</td>
-                <td>@FormatSize(msg.SizeBytes)</td>
-                <td><span class="badge badge-@msg.Status.ToString().ToLowerInvariant()">@msg.Status</span></td>
-                <td>@msg.RetryCount</td>
-                <td>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
-                <td class="flex gap-1">
-                    @if (msg.Status is MessageStatus.Failed or MessageStatus.Bounced)
-                    {
-                        <button class="btn btn-sm btn-primary" @onclick="() => RetryAsync(msg.Id)">Retry</button>
-                    }
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteAsync(msg.Id)">Delete</button>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+@if (!loaded)
+{
+    <BbSkeleton Class="h-[300px] w-full" />
+}
+else
+{
+    <BbTable Data="@messages">
+        <BbTableHeader>
+            <BbTableRow TData="QueuedMessage">
+                <BbTableHeaderCell TData="QueuedMessage">ID</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Message-ID</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Sender</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Recipients</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Size</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Status</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Retries</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Created</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Actions</BbTableHeaderCell>
+            </BbTableRow>
+        </BbTableHeader>
+        <BbTableBody>
+            @if (messages.Count == 0)
+            {
+                <BbTableRow TData="QueuedMessage">
+                    <BbTableCell colspan="9" class="text-muted">Queue is empty</BbTableCell>
+                </BbTableRow>
+            }
+            @foreach (var msg in messages)
+            {
+                <BbTableRow Item="@msg">
+                    <BbTableCell class="mono">@msg.Id</BbTableCell>
+                    <BbTableCell>
+                        <BbTooltip>
+                            <BbTooltipTrigger>
+                                <span class="mono" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;">@msg.MessageId</span>
+                            </BbTooltipTrigger>
+                            <BbTooltipContent>@msg.MessageId</BbTooltipContent>
+                        </BbTooltip>
+                    </BbTableCell>
+                    <BbTableCell>@msg.Sender</BbTableCell>
+                    <BbTableCell>@msg.Recipients</BbTableCell>
+                    <BbTableCell>@FormatSize(msg.SizeBytes)</BbTableCell>
+                    <BbTableCell><BbBadge Variant="@GetBadgeVariant(msg.Status)">@msg.Status</BbBadge></BbTableCell>
+                    <BbTableCell>@msg.RetryCount</BbTableCell>
+                    <BbTableCell>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</BbTableCell>
+                    <BbTableCell>
+                        <BbDropdownMenu>
+                            <BbDropdownMenuTrigger>
+                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost">
+                                    <LucideIcon Name="ellipsis" />
+                                </BbButton>
+                            </BbDropdownMenuTrigger>
+                            <BbDropdownMenuContent>
+                                @if (msg.Status is MessageStatus.Failed or MessageStatus.Bounced)
+                                {
+                                    <BbDropdownMenuItem @onclick="() => RetryAsync(msg.Id)">
+                                        <LucideIcon Name="rotate-ccw" /> Retry
+                                    </BbDropdownMenuItem>
+                                    <BbDropdownMenuSeparator />
+                                }
+                                <BbDropdownMenuItem @onclick="() => { deleteTargetId = msg.Id; showDeleteConfirm = true; }">
+                                    <LucideIcon Name="trash-2" /> Delete
+                                </BbDropdownMenuItem>
+                            </BbDropdownMenuContent>
+                        </BbDropdownMenu>
+                    </BbTableCell>
+                </BbTableRow>
+            }
+        </BbTableBody>
+    </BbTable>
+}
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
-    <p class="mt-1 text-muted">@statusMessage</p>
+    <BbAlert Class="mt-1">@statusMessage</BbAlert>
 }
+
+<BbAlertDialog @bind-Open="showDeleteConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Message</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will permanently remove the message from the queue. This action cannot be undone.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
 
 @code {
     private IReadOnlyList<QueuedMessage> messages = [];
     private string? statusMessage;
+    private bool loaded;
+    private bool showDeleteConfirm;
+    private long deleteTargetId;
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();
 
@@ -67,6 +130,7 @@
         var queue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
         messages = await queue.GetPendingAsync(100);
         statusMessage = null;
+        loaded = true;
     }
 
     private async Task RetryAsync(long id)
@@ -77,6 +141,12 @@
         await queue.SetRetryAsync(id, 0, DateTime.UtcNow);
         statusMessage = $"Message {id} re-queued for delivery";
         await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        await DeleteAsync(deleteTargetId);
+        showDeleteConfirm = false;
     }
 
     private async Task DeleteAsync(long id)
@@ -93,5 +163,13 @@
         < 1024 => $"{bytes} B",
         < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
         _ => $"{bytes / (1024.0 * 1024):F1} MB"
+    };
+
+    private static BadgeVariant GetBadgeVariant(MessageStatus status) => status switch
+    {
+        MessageStatus.Delivered => BadgeVariant.Default,
+        MessageStatus.Failed or MessageStatus.Bounced => BadgeVariant.Destructive,
+        MessageStatus.Queued => BadgeVariant.Secondary,
+        _ => BadgeVariant.Outline
     };
 }

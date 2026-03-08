@@ -1,3 +1,6 @@
+using BlazorBlueprint.Components;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using WinSmtpRelay.AdminApi;
 using WinSmtpRelay.Core.Configuration;
@@ -46,6 +49,14 @@ if (adminUiConfig.Enabled)
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
 
+    builder.Services.AddBlazorBlueprintComponents();
+
+    // Show detailed Blazor circuit errors during development
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Services.Configure<Microsoft.AspNetCore.Components.Server.CircuitOptions>(options =>
+            options.DetailedErrors = true);
+    }
     builder.Services.AddSignalR();
     builder.Services.AddHttpClient();
     builder.Services.AddHostedService<WinSmtpRelay.Service.TrayIconService>();
@@ -70,7 +81,7 @@ if (adminUiConfig.Enabled)
     // SignalR hub for live activity
     app.MapHub<ActivityHub>("/hubs/activity");
 
-    // Static assets (serves _framework/blazor.web.js etc.)
+    // Static assets (fingerprinted CSS/JS from RCLs)
     app.MapStaticAssets();
 
     // Blazor Admin UI

@@ -3,53 +3,99 @@
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
 
+<BbBreadcrumb>
+    <BbBreadcrumbList AutoSeparator="true">
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Dashboard</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
 <h1>Dashboard</h1>
 
-<div class="card-grid">
-    <div class="card">
-        <div class="label">Queue Depth</div>
-        <div class="value @(queueDepth > 100 ? "warning" : "")">@queueDepth</div>
+@if (!loaded)
+{
+    <div class="card-grid">
+        @for (var i = 0; i < 3; i++)
+        {
+            <BbCard>
+                <BbCardHeader><BbSkeleton Class="h-4 w-24" /></BbCardHeader>
+                <BbCardContent><BbSkeleton Class="h-8 w-16" /></BbCardContent>
+            </BbCard>
+        }
     </div>
-    <div class="card">
-        <div class="label">Server Uptime</div>
-        <div class="value" style="font-size:1.2rem">@uptime</div>
+}
+else
+{
+    <div class="card-grid">
+        <BbCard>
+            <BbCardHeader>
+                <BbCardDescription>Queue Depth</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="stat-value @(queueDepth > 100 ? "warning" : "")">@queueDepth</div>
+            </BbCardContent>
+        </BbCard>
+        <BbCard>
+            <BbCardHeader>
+                <BbCardDescription>Server Uptime</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="stat-value" style="font-size:1.2rem">@uptime</div>
+            </BbCardContent>
+        </BbCard>
+        <BbCard>
+            <BbCardHeader>
+                <BbCardDescription>Version</BbCardDescription>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="stat-value" style="font-size:1.2rem">@version</div>
+            </BbCardContent>
+        </BbCard>
     </div>
-    <div class="card">
-        <div class="label">Version</div>
-        <div class="value" style="font-size:1.2rem">@version</div>
-    </div>
-</div>
+}
 
 <h2 style="font-size:1.1rem; margin-bottom:0.75rem">Recent Messages</h2>
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Sender</th>
-            <th>Recipients</th>
-            <th>Status</th>
-            <th>Created</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (recentMessages.Count == 0)
-        {
-            <tr><td colspan="5" class="text-muted">No messages in queue</td></tr>
-        }
-        @foreach (var msg in recentMessages)
-        {
-            <tr>
-                <td class="mono">@msg.Id</td>
-                <td>@msg.Sender</td>
-                <td>@msg.Recipients</td>
-                <td><span class="badge badge-@msg.Status.ToString().ToLowerInvariant()">@msg.Status</span></td>
-                <td>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</td>
-            </tr>
-        }
-    </tbody>
-</table>
+
+@if (!loaded)
+{
+    <BbSkeleton Class="h-[300px] w-full" />
+}
+else
+{
+    <BbTable Data="@recentMessages">
+        <BbTableHeader>
+            <BbTableRow TData="QueuedMessage">
+                <BbTableHeaderCell TData="QueuedMessage">ID</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Sender</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Recipients</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Status</BbTableHeaderCell>
+                <BbTableHeaderCell TData="QueuedMessage">Created</BbTableHeaderCell>
+            </BbTableRow>
+        </BbTableHeader>
+        <BbTableBody>
+            @if (recentMessages.Count == 0)
+            {
+                <BbTableRow TData="QueuedMessage">
+                    <BbTableCell colspan="5" class="text-muted">No messages in queue</BbTableCell>
+                </BbTableRow>
+            }
+            @foreach (var msg in recentMessages)
+            {
+                <BbTableRow Item="@msg">
+                    <BbTableCell class="mono">@msg.Id</BbTableCell>
+                    <BbTableCell>@msg.Sender</BbTableCell>
+                    <BbTableCell>@msg.Recipients</BbTableCell>
+                    <BbTableCell><BbBadge Variant="@GetBadgeVariant(msg.Status)">@msg.Status</BbBadge></BbTableCell>
+                    <BbTableCell>@msg.CreatedUtc.ToString("yyyy-MM-dd HH:mm")</BbTableCell>
+                </BbTableRow>
+            }
+        </BbTableBody>
+    </BbTable>
+}
 
 @code {
+    private bool loaded;
     private int queueDepth;
     private string uptime = "";
     private string version = "";
@@ -70,5 +116,14 @@
             : $"{elapsed.Hours}h {elapsed.Minutes}m";
 
         version = typeof(Dashboard).Assembly.GetName().Version?.ToString() ?? "dev";
+        loaded = true;
     }
+
+    private static BadgeVariant GetBadgeVariant(MessageStatus status) => status switch
+    {
+        MessageStatus.Delivered => BadgeVariant.Default,
+        MessageStatus.Failed or MessageStatus.Bounced => BadgeVariant.Destructive,
+        MessageStatus.Queued => BadgeVariant.Secondary,
+        _ => BadgeVariant.Outline
+    };
 }

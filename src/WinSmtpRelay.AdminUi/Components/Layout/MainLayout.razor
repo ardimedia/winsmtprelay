@@ -1,22 +1,98 @@
 @inherits LayoutComponentBase
 
-<div class="app">
-    <nav class="sidebar">
-        <div class="brand">
-            <h2>WinSmtpRelay</h2>
-        </div>
-        <ul class="nav-menu">
-            <li><NavLink href="" Match="NavLinkMatch.All">Dashboard</NavLink></li>
-            <li><NavLink href="queue">Queue</NavLink></li>
-            <li><NavLink href="journal">Journal</NavLink></li>
-            <li><NavLink href="activity">Live Activity</NavLink></li>
-            <li><NavLink href="users">Users</NavLink></li>
-            <li><NavLink href="config">Configuration</NavLink></li>
-            <li><NavLink href="logs">Event Log</NavLink></li>
-            <li><NavLink href="update">Update</NavLink></li>
-        </ul>
-    </nav>
-    <main class="content">
-        @Body
-    </main>
-</div>
+<BbTooltipProvider>
+<BbSidebarProvider DefaultOpen="true">
+    <BbSidebar>
+        <BbSidebarHeader>
+            <BbSidebarHeaderContent>
+                <BbSidebarHeaderInfo>
+                    <span style="font-weight:600;font-size:1.1rem;">WinSmtpRelay</span>
+                </BbSidebarHeaderInfo>
+            </BbSidebarHeaderContent>
+        </BbSidebarHeader>
+
+        <BbSidebarContent>
+            <BbSidebarGroup>
+                <BbSidebarGroupLabel>Monitor</BbSidebarGroupLabel>
+                <BbSidebarMenu>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="/" Match="NavLinkMatch.All">
+                            <LucideIcon Name="layout-dashboard" />
+                            <span>Dashboard</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="activity">
+                            <LucideIcon Name="activity" />
+                            <span>Live Activity</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </BbSidebarMenu>
+            </BbSidebarGroup>
+
+            <BbSidebarGroup>
+                <BbSidebarGroupLabel>Mail</BbSidebarGroupLabel>
+                <BbSidebarMenu>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="queue">
+                            <LucideIcon Name="inbox" />
+                            <span>Queue</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="journal">
+                            <LucideIcon Name="book-open" />
+                            <span>Journal</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </BbSidebarMenu>
+            </BbSidebarGroup>
+
+            <BbSidebarGroup>
+                <BbSidebarGroupLabel>Admin</BbSidebarGroupLabel>
+                <BbSidebarMenu>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="users">
+                            <LucideIcon Name="users" />
+                            <span>Users</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="config">
+                            <LucideIcon Name="settings" />
+                            <span>Configuration</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="logs">
+                            <LucideIcon Name="file-text" />
+                            <span>Event Log</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="update">
+                            <LucideIcon Name="download" />
+                            <span>Update</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </BbSidebarMenu>
+            </BbSidebarGroup>
+        </BbSidebarContent>
+
+        <BbSidebarFooter>
+            <span class="text-muted" style="font-size:0.75rem;">Admin Panel</span>
+        </BbSidebarFooter>
+    </BbSidebar>
+
+    <BbSidebarInset>
+        <header style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem 2rem;border-bottom:1px solid var(--border);">
+            <BbSidebarTrigger />
+        </header>
+        <main style="flex:1;padding:2rem;overflow-y:auto;">
+            @Body
+        </main>
+    </BbSidebarInset>
+</BbSidebarProvider>
+</BbTooltipProvider>
+
+<BbPortalHost />
