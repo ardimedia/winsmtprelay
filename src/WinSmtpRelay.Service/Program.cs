@@ -42,6 +42,9 @@ builder.Services.AddSmtpListener();
 // Delivery Engine
 builder.Services.AddDeliveryEngine();
 
+// Service state reporter — writes registry flag for MSI upgrade detection
+builder.Services.AddHostedService<WinSmtpRelay.Service.ServiceStateReporter>();
+
 // Kestrel for Admin UI + API
 var adminUiConfig = builder.Configuration.GetSection(AdminUiOptions.SectionName).Get<AdminUiOptions>() ?? new();
 if (adminUiConfig.Enabled)

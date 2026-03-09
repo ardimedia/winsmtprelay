@@ -20,9 +20,25 @@
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
 
-    <!-- Exit dialog: "Start service now?" checkbox (new installs only) -->
+    <!-- Detect whether the service was running before upgrade (read during AppSearch, before service is stopped) -->
+    <Property Id="SERVICEWASRUNNING">
+      <RegistrySearch Id="ServiceWasRunningSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\ARDIMEDIA\WinSmtpRelay"
+                      Name="ServiceRunning"
+                      Type="raw" />
+    </Property>
+
+    <!-- Exit dialog: "Start service now?" checkbox -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start WinSmtpRelay service now" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+
+    <!-- On upgrade where service was NOT running: uncheck the exit dialog checkbox -->
+    <SetProperty Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX"
+                 Value="{}"
+                 Before="CostFinalize"
+                 Sequence="ui"
+                 Condition="WIX_UPGRADE_DETECTED AND NOT (SERVICEWASRUNNING = &quot;#1&quot;)" />
 
     <!-- WixUI ExitDlg triggers DoAction "LaunchApplication" when checkbox is checked -->
     <CustomAction Id="LaunchApplication"
@@ -31,6 +47,20 @@
                   Execute="immediate"
                   Return="ignore"
                   Impersonate="no" />
+
+    <!-- Deferred CA: auto-start service during upgrade if it was running before -->
+    <CustomAction Id="StartServiceOnUpgrade"
+                  Directory="SystemFolder"
+                  ExeCommand="sc.exe start WinSmtpRelay"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <InstallExecuteSequence>
+      <Custom Action="StartServiceOnUpgrade"
+              After="StartServices"
+              Condition="WIX_UPGRADE_DETECTED AND (SERVICEWASRUNNING = &quot;#1&quot;)" />
+    </InstallExecuteSequence>
 
     <!-- .NET 10 runtime check for framework-dependent variant -->
     <?if $(var.SelfContained) = false ?>

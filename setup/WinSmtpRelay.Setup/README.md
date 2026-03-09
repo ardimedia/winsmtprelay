@@ -20,13 +20,13 @@ D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 fetch latest updates from github
 update all release references (readme.md, etc) to the new version, check also this:
     <Version>1.0.0</Version>
-    <VersionSuffix>beta19</VersionSuffix>
-    git commit -m "bump version to 1.0.0-beta19"
-    git tag v1.0.0-beta19
+    <VersionSuffix>beta20</VersionSuffix>
+    git commit -m "bump version to 1.0.0-beta20"
+    git tag v1.0.0-beta20
 
 make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
 make sure the version below is higher than the current one, otherwise aboard with a message
-bump to 1.0.0-beta19 and push
+bump to 1.0.0-beta20 and push
 ```
 
 **1. Bump the version** in `Directory.Build.props`:

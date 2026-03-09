@@ -23,10 +23,12 @@
                             ResetPeriodInDays="1" />
       </ServiceInstall>
 
+      <!-- Stop on both install (for file replacement) and uninstall.
+           Remove service definition only on uninstall.
+           Service start is handled by the exit dialog checkbox + deferred CA for upgrades. -->
       <ServiceControl Id="StopWinSmtpRelay"
                       Name="WinSmtpRelay"
                       Stop="both"
-                      Start="install"
                       Remove="uninstall"
                       Wait="yes" />
     </Component>
@@ -38,10 +40,11 @@
 
     <!-- Windows Firewall inbound rules for SMTP and Admin UI -->
     <Component Id="FirewallRules" Directory="INSTALLFOLDER" Guid="a1e7c3f9-2d4b-4e8a-9f6c-5b3d1a0e7f2c">
-      <RegistryValue Root="HKLM"
-                     Key="SOFTWARE\ARDIMEDIA\WinSmtpRelay"
-                     Name="FirewallConfigured"
-                     Type="integer" Value="1" KeyPath="yes" />
+      <RegistryKey Root="HKLM" Key="SOFTWARE\ARDIMEDIA\WinSmtpRelay">
+        <RegistryValue Name="FirewallConfigured" Type="integer" Value="1" KeyPath="yes" />
+        <!-- Grant NetworkService write access so the service can write the ServiceRunning flag -->
+        <util:PermissionEx User="NT AUTHORITY\NetworkService" GenericAll="yes" />
+      </RegistryKey>
 
       <fw:FirewallException Id="SmtpPort25"
                             Name="WinSmtpRelay SMTP (25)"
