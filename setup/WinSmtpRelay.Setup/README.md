@@ -17,10 +17,11 @@ Lets Claude do a release on github:
 
 ```
 D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
+fetch latest updates from github
 update all release references (readme.md, etc) to the new version
 make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
 make sure the version below is higher than the current one, otherwise aboard with a message
-bump to 1.0.0-beta17 and push
+bump to 1.0.0-beta18 and push
 ```
 
 
