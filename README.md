@@ -2,6 +2,9 @@
 
 > **Work in progress** — This project is under active development and not yet ready for production use.
 
+> **Hosted Service** — We are considering offering WinSmtpRelay as a hosted/managed service. For test environments, we would provide the service free of charge. If you are interested, please [open an issue](https://github.com/ardimedia/winsmtprelay/issues) and let us know about your use case.
+
+
 Open-source SMTP relay server for Windows. Built with .NET 10, designed as a modern replacement for IIS SMTP.
 
 **Relay only** — no mailboxes, no IMAP, no POP3. Accepts mail from internal apps/devices and forwards it via MX lookup or smart host.
