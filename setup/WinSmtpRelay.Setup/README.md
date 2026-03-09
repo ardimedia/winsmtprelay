@@ -20,20 +20,20 @@ D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 fetch latest updates from github
 update all release references (readme.md, etc) to the new version, check also this:
     <Version>1.0.0</Version>
-    <VersionSuffix>beta1-build20</VersionSuffix>
-    git commit -m "bump version to 1.0.0-beta1-build20"
-    git tag v1.0.0-beta1-build20
+    <VersionSuffix>beta1-build21</VersionSuffix>
+    git commit -m "bump version to 1.0.0-beta1-build21"
+    git tag v1.0.0-beta1-build21
 
 make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
 make sure the version below is higher than the current one, otherwise aboard with a message
-bump to 1.0.0-beta1-build20 and push
+bump to 1.0.0-beta1-build22 and push
 ```
 
 **1. Bump the version** in `Directory.Build.props`:
 
 ```xml
 <!-- Examples: -->
-<Version>1.0.0</Version>  <VersionSuffix>beta1-build21</VersionSuffix>   <!-- pre-release, next build -->
+<Version>1.0.0</Version>  <VersionSuffix>beta1-build22</VersionSuffix>   <!-- pre-release, next build -->
 <Version>1.0.0</Version>  <VersionSuffix></VersionSuffix>                 <!-- stable release -->
 <Version>1.1.0</Version>  <VersionSuffix>beta1-build1</VersionSuffix>    <!-- next minor -->
 ```
@@ -42,8 +42,8 @@ bump to 1.0.0-beta1-build20 and push
 
 ```bash
 git add Directory.Build.props
-git commit -m "bump version to 1.0.0-beta1-build21"
-git tag v1.0.0-beta1-build21
+git commit -m "bump version to 1.0.0-beta1-build22"
+git tag v1.0.0-beta1-build22
 git push origin main --tags
 ```
 
@@ -71,9 +71,9 @@ git push origin main --tags
 | Property | Example | Where it appears |
 |----------|---------|-----------------|
 | `Version` | `1.0.0` | MSI version, `AssemblyVersion`, `FileVersion` |
-| `VersionSuffix` | `beta1-build20` | Pre-release label |
-| `InformationalVersion` | `1.0.0-beta1-build20` | Admin UI `/api/server/info`, Windows file details |
-| MSI product name | `WinSmtpRelay 1.0.0 Beta 1 Build 20` | Add/Remove Programs |
+| `VersionSuffix` | `beta1-build21` | Pre-release label |
+| `InformationalVersion` | `1.0.0-beta1-build21` | Admin UI `/api/server/info`, Windows file details |
+| MSI product name | `WinSmtpRelay 1.0.0 Beta 1 Build 21` | Add/Remove Programs |
 
 MSI only supports 3-part numeric versions. The pre-release label goes in the product display name (`Package.wxs`), not the MSI version field.
 
