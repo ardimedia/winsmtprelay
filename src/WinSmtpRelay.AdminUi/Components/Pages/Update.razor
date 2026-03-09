@@ -1,5 +1,6 @@
 @page "/update"
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @inject IHttpClientFactory HttpClientFactory
 
 <BbBreadcrumb>
@@ -27,88 +28,108 @@
 <BbCard Class="mb-1">
     <BbCardHeader><BbCardTitle>Current Version</BbCardTitle></BbCardHeader>
     <BbCardContent>
-        <p><strong>@currentVersion</strong></p>
+        <p>
+            <strong>@currentVersion</strong>
+            @if (IsPrerelease(currentVersion))
+            {
+                <span class="badge-status badge-info" style="margin-left:0.5rem;">Pre-release</span>
+            }
+            else
+            {
+                <span class="badge-status badge-success" style="margin-left:0.5rem;">Stable</span>
+            }
+        </p>
     </BbCardContent>
 </BbCard>
 
-<BbCard>
-    <BbCardHeader><BbCardTitle>Latest Release</BbCardTitle></BbCardHeader>
-    <BbCardContent>
-        @if (isChecking)
-        {
+@if (isChecking)
+{
+    <BbCard>
+        <BbCardContent Class="pt-6">
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <BbSpinner />
                 <span class="text-muted">Checking for updates...</span>
             </div>
-        }
-        else if (errorMessage is not null)
-        {
+        </BbCardContent>
+    </BbCard>
+}
+else if (errorMessage is not null)
+{
+    <BbCard>
+        <BbCardContent Class="pt-6">
             <BbAlert>@errorMessage</BbAlert>
             <BbButton Variant="ButtonVariant.Outline" @onclick="CheckForUpdates" Class="mt-1">
                 <LucideIcon Name="refresh-cw" />
                 Retry
             </BbButton>
-        }
-        else if (latestRelease is not null)
-        {
-            <p>
-                <strong>@latestRelease.TagName</strong>
-                @if (isNewer)
+        </BbCardContent>
+    </BbCard>
+}
+else if (hasChecked)
+{
+    <BbCard Class="mb-1">
+        <BbCardHeader>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <BbCardTitle>Latest Stable Release</BbCardTitle>
+                @if (latestStable is not null)
                 {
-                    <span class="badge-status badge-warning" style="margin-left:0.5rem;">Update Available</span>
+                    @if (isStableNewer)
+                    {
+                        <span class="badge-status badge-warning">Update Available</span>
+                    }
+                    else
+                    {
+                        <span class="badge-status badge-success">Up to date</span>
+                    }
                 }
-                else
-                {
-                    <span class="badge-status badge-success" style="margin-left:0.5rem;">Up to date</span>
-                }
-            </p>
-            <p>@latestRelease.Name</p>
-            <p class="text-muted">Published: @latestRelease.PublishedAt?.ToString("yyyy-MM-dd HH:mm")</p>
-
-            @if (latestRelease.Assets.Count > 0)
+            </div>
+        </BbCardHeader>
+        <BbCardContent>
+            @if (latestStable is not null)
             {
-                <BbSeparator Class="my-1" />
-                <h4>Downloads</h4>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Size</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var asset in latestRelease.Assets)
-                        {
-                            <tr>
-                                <td>
-                                    <a href="@asset.DownloadUrl" target="_blank">
-                                        <LucideIcon Name="download" />
-                                        @asset.Name
-                                    </a>
-                                </td>
-                                <td class="text-muted">@FormatSize(asset.Size)</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                @RenderRelease(latestStable)
             }
-
-            @if (!string.IsNullOrEmpty(latestRelease.Body))
+            else
             {
-                <BbSeparator Class="my-1" />
-                <h4>Release Notes</h4>
-                <pre style="white-space:pre-wrap;font-size:0.85rem;max-height:300px;overflow-y:auto;">@latestRelease.Body</pre>
+                <p class="text-muted">No stable release published yet.</p>
             }
-        }
-        else
-        {
+        </BbCardContent>
+    </BbCard>
+
+    @if (latestPrerelease is not null)
+    {
+        <BbCard Class="mb-1">
+            <BbCardHeader>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <BbCardTitle>Latest Pre-release</BbCardTitle>
+                    @if (isPrereleaseNewer)
+                    {
+                        <span class="badge-status badge-warning">Update Available</span>
+                    }
+                    else
+                    {
+                        <span class="badge-status badge-success">Up to date</span>
+                    }
+                </div>
+            </BbCardHeader>
+            <BbCardContent>
+                @RenderRelease(latestPrerelease)
+            </BbCardContent>
+        </BbCard>
+    }
+
+}
+else
+{
+    <BbCard Class="mt-1">
+        <BbCardContent Class="pt-6">
             <BbButton Variant="ButtonVariant.Default" @onclick="CheckForUpdates">
                 <LucideIcon Name="download" />
                 Check for Updates
             </BbButton>
-        }
-    </BbCardContent>
-</BbCard>
+        </BbCardContent>
+    </BbCard>
+}
 
 <BbDialog @bind-Open="showHelp">
     <BbDialogContent>
@@ -124,7 +145,7 @@
             <h4 style="margin-top:1rem;">How it works</h4>
             <ol style="padding-left:1.25rem;">
                 <li>Click <strong>Check for Updates</strong> to query the GitHub API.</li>
-                <li>The current running version is compared against the latest published release tag.</li>
+                <li>The current running version is compared against the latest stable and pre-release tags.</li>
                 <li>If a newer version is available, an <strong>Update Available</strong> badge is shown along with download links and release notes.</li>
             </ol>
             <h4 style="margin-top:1rem;">Updating</h4>
@@ -153,15 +174,87 @@
                                      ?? typeof(Update).Assembly.GetName().Version?.ToString()
                                      ?? "0.0.0";
     private bool isChecking;
+    private bool hasChecked;
     private string? errorMessage;
-    private GitHubRelease? latestRelease;
-    private bool isNewer;
+    private GitHubRelease? latestStable;
+    private GitHubRelease? latestPrerelease;
+    private bool isStableNewer;
+    private bool isPrereleaseNewer;
+
+    private RenderFragment RenderRelease(GitHubRelease release) => __builder =>
+    {
+        var version = release.TagName?.TrimStart('v') ?? "";
+        var scAsset = release.Assets.FirstOrDefault(a => a.Name.Contains("self-contained"));
+        var fdAsset = release.Assets.FirstOrDefault(a => !a.Name.Contains("self-contained") && a.Name.EndsWith(".msi"));
+
+        <p><strong>@release.TagName</strong></p>
+        <p>@release.Name</p>
+        <p class="text-muted">Published: @release.PublishedAt?.ToString("yyyy-MM-dd HH:mm")</p>
+
+        if (scAsset is not null || fdAsset is not null)
+        {
+            <BbSeparator Class="my-1" />
+            <h4>Downloads — @version</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variant</th>
+                        <th>File</th>
+                        <th>Size</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (scAsset is not null)
+                    {
+                        <tr>
+                            <td><strong>Self-contained</strong><br /><span class="text-muted" style="font-size:0.8rem;">No prerequisites</span></td>
+                            <td>
+                                <a href="@scAsset.DownloadUrl" target="_blank">
+                                    <LucideIcon Name="download" /> @scAsset.Name
+                                </a>
+                            </td>
+                            <td class="text-muted">@FormatSize(scAsset.Size)</td>
+                        </tr>
+                    }
+                    @if (fdAsset is not null)
+                    {
+                        <tr>
+                            <td><strong>Framework-dependent</strong><br /><span class="text-muted" style="font-size:0.8rem;">Requires .NET 10 Runtime</span></td>
+                            <td>
+                                <a href="@fdAsset.DownloadUrl" target="_blank">
+                                    <LucideIcon Name="download" /> @fdAsset.Name
+                                </a>
+                            </td>
+                            <td class="text-muted">@FormatSize(fdAsset.Size)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        if (!string.IsNullOrEmpty(release.Body))
+        {
+            <BbSeparator Class="my-1" />
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <h4 style="margin:0;">Release Notes</h4>
+                @if (!string.IsNullOrEmpty(release.HtmlUrl))
+                {
+                    <a href="@release.HtmlUrl" target="_blank" class="text-muted" style="font-size:0.8rem;display:inline-flex;align-items:center;gap:0.25rem;">
+                        <LucideIcon Name="external-link" /> View on GitHub
+                    </a>
+                }
+            </div>
+            <pre style="white-space:pre-wrap;font-size:0.85rem;max-height:300px;overflow-y:auto;">@release.Body</pre>
+        }
+    };
 
     private async Task CheckForUpdates()
     {
         isChecking = true;
         errorMessage = null;
-        latestRelease = null;
+        latestStable = null;
+        latestPrerelease = null;
+        hasChecked = false;
         StateHasChanged();
 
         try
@@ -170,7 +263,7 @@
             client.DefaultRequestHeaders.Add("User-Agent", "WinSmtpRelay-Admin");
             client.Timeout = TimeSpan.FromSeconds(15);
 
-            var response = await client.GetAsync("https://api.github.com/repos/ardimedia/winsmtprelay/releases/latest");
+            var response = await client.GetAsync("https://api.github.com/repos/ardimedia/winsmtprelay/releases?per_page=30");
             if (!response.IsSuccessStatusCode)
             {
                 errorMessage = $"GitHub API returned {response.StatusCode}. No releases published yet?";
@@ -178,16 +271,27 @@
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            latestRelease = JsonSerializer.Deserialize<GitHubRelease>(json, new JsonSerializerOptions
+            var releases = JsonSerializer.Deserialize<List<GitHubRelease>>(json, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
-            });
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            }) ?? [];
 
-            if (latestRelease is not null)
+            latestStable = releases.FirstOrDefault(r => !r.Prerelease);
+            latestPrerelease = releases.FirstOrDefault(r => r.Prerelease);
+
+            if (latestStable is not null)
             {
-                var latestVer = latestRelease.TagName?.TrimStart('v') ?? "0.0.0";
-                isNewer = string.Compare(latestVer, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
+                var ver = latestStable.TagName?.TrimStart('v') ?? "0.0.0";
+                isStableNewer = CompareVersions(ver, currentVersion) > 0;
             }
+
+            if (latestPrerelease is not null)
+            {
+                var ver = latestPrerelease.TagName?.TrimStart('v') ?? "0.0.0";
+                isPrereleaseNewer = CompareVersions(ver, currentVersion) > 0;
+            }
+
+            hasChecked = true;
         }
         catch (Exception ex)
         {
@@ -198,6 +302,63 @@
             isChecking = false;
         }
     }
+
+    /// <summary>
+    /// Semver-aware comparison: 1.0.0 > 1.0.0-beta13 > 1.0.0-beta2 > 1.0.0-alpha1
+    /// </summary>
+    private static int CompareVersions(string a, string b)
+    {
+        ParseVersion(a, out var aVer, out var aPre);
+        ParseVersion(b, out var bVer, out var bPre);
+
+        var cmp = aVer.CompareTo(bVer);
+        if (cmp != 0) return cmp;
+
+        // No pre-release = stable = higher than any pre-release
+        if (aPre is null && bPre is null) return 0;
+        if (aPre is null) return 1;  // a is stable, b is pre-release
+        if (bPre is null) return -1; // a is pre-release, b is stable
+
+        // Both have pre-release: compare label then number (e.g., alpha < beta < rc)
+        ParsePrerelease(aPre, out var aLabel, out var aNum);
+        ParsePrerelease(bPre, out var bLabel, out var bNum);
+
+        var labelCmp = string.Compare(aLabel, bLabel, StringComparison.OrdinalIgnoreCase);
+        if (labelCmp != 0) return labelCmp;
+        return aNum.CompareTo(bNum);
+    }
+
+    private static void ParseVersion(string version, out Version ver, out string? prerelease)
+    {
+        var idx = version.IndexOf('-');
+        if (idx >= 0)
+        {
+            ver = Version.TryParse(version[..idx], out var v) ? v : new Version(0, 0, 0);
+            prerelease = version[(idx + 1)..];
+        }
+        else
+        {
+            ver = Version.TryParse(version, out var v) ? v : new Version(0, 0, 0);
+            prerelease = null;
+        }
+    }
+
+    private static void ParsePrerelease(string pre, out string label, out int number)
+    {
+        var match = Regex.Match(pre, @"^([a-zA-Z]+)(\d+)$");
+        if (match.Success)
+        {
+            label = match.Groups[1].Value.ToLowerInvariant();
+            number = int.Parse(match.Groups[2].Value);
+        }
+        else
+        {
+            label = pre.ToLowerInvariant();
+            number = 0;
+        }
+    }
+
+    private static bool IsPrerelease(string version) => version.Contains('-');
 
     private static string FormatSize(long bytes) => bytes switch
     {
@@ -211,6 +372,7 @@
         public string? TagName { get; set; }
         public string? Name { get; set; }
         public string? Body { get; set; }
+        public string? HtmlUrl { get; set; }
         public DateTime? PublishedAt { get; set; }
         public bool Prerelease { get; set; }
         public List<GitHubAsset> Assets { get; set; } = [];

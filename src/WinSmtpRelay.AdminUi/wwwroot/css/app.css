@@ -170,10 +170,11 @@ nav[aria-label="breadcrumb"] {
     justify-content: space-between;
 }
 
-/* Tab detail area: about button aligned right */
-.tab-header-row {
+/* Tabs bar: tabs + about button on same line */
+.tabs-bar {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 0.75rem;
 }
 

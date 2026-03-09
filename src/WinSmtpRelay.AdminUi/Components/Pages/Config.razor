@@ -1,5 +1,8 @@
 @page "/config"
 @using Microsoft.Extensions.Options
+@using System.Net
+@using System.Net.NetworkInformation
+@using System.Net.Sockets
 @using WinSmtpRelay.Core.Configuration
 @inject IOptions<SmtpListenerOptions> SmtpOptions
 @inject IOptions<DeliveryOptions> DeliveryOpts
@@ -28,20 +31,41 @@
     <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
 </div>
 
-<BbTabs DefaultValue="listener">
-    <BbTabsList>
-        <BbTabsTrigger Value="listener">Listener</BbTabsTrigger>
-        <BbTabsTrigger Value="delivery">Delivery</BbTabsTrigger>
-        <BbTabsTrigger Value="security">Security</BbTabsTrigger>
-        <BbTabsTrigger Value="advanced">Advanced</BbTabsTrigger>
-    </BbTabsList>
-
-    <BbTabsContent Value="listener">
-        <div class="tab-header-row">
+<BbTabs DefaultValue="listener" @bind-Value="activeConfigTab">
+    <div class="tabs-bar">
+        <BbTabsList>
+            <BbTabsTrigger Value="listener">Listener</BbTabsTrigger>
+            <BbTabsTrigger Value="delivery">Delivery</BbTabsTrigger>
+            <BbTabsTrigger Value="security">Security</BbTabsTrigger>
+            <BbTabsTrigger Value="advanced">Advanced</BbTabsTrigger>
+        </BbTabsList>
+        @if (activeConfigTab == "listener")
+        {
             <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showListenerHelp = true">
                 <LucideIcon Name="info" /> About Listener
             </BbButton>
-        </div>
+        }
+        else if (activeConfigTab == "delivery")
+        {
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showDeliveryHelp = true">
+                <LucideIcon Name="info" /> About Delivery
+            </BbButton>
+        }
+        else if (activeConfigTab == "security")
+        {
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showSecurityHelp = true">
+                <LucideIcon Name="info" /> About Security
+            </BbButton>
+        }
+        else if (activeConfigTab == "advanced")
+        {
+            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showAdvancedHelp = true">
+                <LucideIcon Name="info" /> About Advanced
+            </BbButton>
+        }
+    </div>
+
+    <BbTabsContent Value="listener">
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>SMTP Listener</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -85,11 +109,6 @@
     </BbTabsContent>
 
     <BbTabsContent Value="delivery">
-        <div class="tab-header-row">
-            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showDeliveryHelp = true">
-                <LucideIcon Name="info" /> About Delivery
-            </BbButton>
-        </div>
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>Delivery</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -142,11 +161,6 @@
     </BbTabsContent>
 
     <BbTabsContent Value="security">
-        <div class="tab-header-row">
-            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showSecurityHelp = true">
-                <LucideIcon Name="info" /> About Security
-            </BbButton>
-        </div>
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>TLS</BbCardTitle></BbCardHeader>
             <BbCardContent>
@@ -196,11 +210,6 @@
     </BbTabsContent>
 
     <BbTabsContent Value="advanced">
-        <div class="tab-header-row">
-            <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showAdvancedHelp = true">
-                <LucideIcon Name="info" /> About Advanced
-            </BbButton>
-        </div>
         @if (FilterOpts.Value.HeaderRewrites.Count > 0 || FilterOpts.Value.SenderRewrites.Count > 0)
         {
             <BbCard Class="mb-1">
@@ -311,6 +320,13 @@
             <BbCardContent>
                 <div>
                     <span class="text-muted">Bind:</span> @AdminOpts.Value.BindAddress:@AdminOpts.Value.Port
+                </div>
+                <div class="mt-1">
+                    <span class="text-muted">Reachable at:</span>
+                    @foreach (var url in GetReachableUrls())
+                    {
+                        <span class="mono" style="margin-right:1rem;">@url</span>
+                    }
                 </div>
             </BbCardContent>
         </BbCard>
@@ -463,8 +479,40 @@
 </BbDialog>
 
 @code {
+    private string activeConfigTab = "listener";
     private bool showListenerHelp;
     private bool showDeliveryHelp;
     private bool showSecurityHelp;
     private bool showAdvancedHelp;
+
+    private List<string> GetReachableUrls()
+    {
+        var bind = AdminOpts.Value.BindAddress;
+        var port = AdminOpts.Value.Port;
+        var urls = new List<string>();
+
+        if (bind is "0.0.0.0" or "::" or "*")
+        {
+            urls.Add($"http://localhost:{port}");
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+                foreach (var addr in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (addr.Address.AddressFamily == AddressFamily.InterNetwork
+                        && !IPAddress.IsLoopback(addr.Address))
+                    {
+                        urls.Add($"http://{addr.Address}:{port}");
+                    }
+                }
+            }
+        }
+        else
+        {
+            urls.Add($"http://{bind}:{port}");
+        }
+
+        return urls;
+    }
 }
