@@ -5,8 +5,8 @@
 Version is defined in one place: `Directory.Build.props` at the repo root.
 
 ```xml
-<Version>1.0.0</Version>
-<VersionSuffix>beta1</VersionSuffix>
+<Version>N.N.N</Version>
+<VersionSuffix>betaN-buildN</VersionSuffix>
 ```
 
 This flows to all assemblies, the Admin UI `/api/server/info` endpoint, and the MSI installer.
@@ -16,34 +16,36 @@ This flows to all assemblies, the Admin UI `/api/server/info` endpoint, and the 
 Lets Claude do a release on github:
 
 ```
-D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 fetch latest updates from github
+bump to 1.0.0-beta1-build24
+
+D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 update all release references (readme.md, etc) to the new version, check also this:
-    <Version>1.0.0</Version>
-    <VersionSuffix>beta1-build21</VersionSuffix>
-    git commit -m "bump version to 1.0.0-beta1-build21"
-    git tag v1.0.0-beta1-build21
+    <Version>N.N.N</Version>
+    <VersionSuffix>betaN-buildN</VersionSuffix>
+    git commit -m "bump version to N.N.N-betaN-buildN"
+    git tag vN.N.N-betaN-buildN
 
 make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
 make sure the version below is higher than the current one, otherwise aboard with a message
-bump to 1.0.0-beta1-build22 and push
+github push
 ```
 
 **1. Bump the version** in `Directory.Build.props`:
 
 ```xml
 <!-- Examples: -->
-<Version>1.0.0</Version>  <VersionSuffix>beta1-build22</VersionSuffix>   <!-- pre-release, next build -->
-<Version>1.0.0</Version>  <VersionSuffix></VersionSuffix>                 <!-- stable release -->
-<Version>1.1.0</Version>  <VersionSuffix>beta1-build1</VersionSuffix>    <!-- next minor -->
+<Version>N.N.N</Version>  <VersionSuffix>betaN-buildN</VersionSuffix>   <!-- pre-release, next build -->
+<Version>N.N.N</Version>  <VersionSuffix></VersionSuffix>               <!-- stable release -->
+<Version>N.N.N</Version>  <VersionSuffix>betaN-buildN</VersionSuffix>   <!-- next minor -->
 ```
 
 **2. Commit and tag:**
 
 ```bash
 git add Directory.Build.props
-git commit -m "bump version to 1.0.0-beta1-build22"
-git tag v1.0.0-beta1-build22
+git commit -m "bump version to N.N.N-betaN-buildN"
+git tag vN.N.N-betaN-buildN
 git push origin main --tags
 ```
 
@@ -55,25 +57,14 @@ git push origin main --tags
 - Creates a GitHub Release (pre-release if tag contains `alpha`, `beta`, `rc`, or `preview`)
 - Uploads both MSIs as release assets
 
-### Version lifecycle example
-
-| Step | `Version` | `VersionSuffix` | Tag | GitHub Release |
-|------|-----------|-----------------|-----|---------------|
-| Beta 1 build 1 | `1.0.0` | `beta1-build1` | `v1.0.0-beta1-build1` | Pre-release |
-| Beta 1 build 20 | `1.0.0` | `beta1-build20` | `v1.0.0-beta1-build20` | Pre-release |
-| Beta 2 build 1 | `1.0.0` | `beta2-build1` | `v1.0.0-beta2-build1` | Pre-release |
-| Release candidate | `1.0.0` | `rc1` | `v1.0.0-rc1` | Pre-release |
-| Stable | `1.0.0` | *(empty)* | `v1.0.0` | Stable |
-| Next minor | `1.1.0` | `beta1-build1` | `v1.1.0-beta1-build1` | Pre-release |
-
 ### How it works internally
 
 | Property | Example | Where it appears |
 |----------|---------|-----------------|
-| `Version` | `1.0.0` | MSI version, `AssemblyVersion`, `FileVersion` |
-| `VersionSuffix` | `beta1-build21` | Pre-release label |
-| `InformationalVersion` | `1.0.0-beta1-build21` | Admin UI `/api/server/info`, Windows file details |
-| MSI product name | `WinSmtpRelay 1.0.0 Beta 1 Build 21` | Add/Remove Programs |
+| `Version` | `N.N.N` | MSI version, `AssemblyVersion`, `FileVersion` |
+| `VersionSuffix` | `betaN-buildN` | Pre-release label |
+| `InformationalVersion` | `N.N.N-betaN-buildN` | Admin UI `/api/server/info`, Windows file details |
+| MSI product name | `WinSmtpRelay N.N.N Beta N Build N` | Add/Remove Programs |
 
 MSI only supports 3-part numeric versions. The pre-release label goes in the product display name (`Package.wxs`), not the MSI version field.
 
@@ -104,10 +95,10 @@ dotnet publish src/WinSmtpRelay.Service/WinSmtpRelay.Service.csproj -c Release -
 
 ```bash
 # Self-contained
-dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-sc/ -p:ProductVersion=1.0.0 -p:SelfContained=true
+dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-sc/ -p:ProductVersion=N.N.N -p:SelfContained=true
 
 # Framework-dependent
-dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-fd/ -p:ProductVersion=1.0.0 -p:SelfContained=false
+dotnet build setup/WinSmtpRelay.Setup/WinSmtpRelay.Setup.wixproj -c Release -p:HarvestPath=../../publish-fd/ -p:ProductVersion=N.N.N -p:SelfContained=false
 ```
 
 Output: `setup/WinSmtpRelay.Setup/bin/Release/*.msi`
@@ -117,7 +108,7 @@ Output: `setup/WinSmtpRelay.Setup/bin/Release/*.msi`
 | Property | Default | Description |
 |----------|---------|-------------|
 | `HarvestPath` | `../../publish/` | Path to `dotnet publish` output |
-| `ProductVersion` | `1.0.0` | 3-part version number (no pre-release suffix) |
+| `ProductVersion` | `N.N.N` | 3-part version number (no pre-release suffix) |
 | `SelfContained` | *(empty)* | Set to `true` for self-contained variant; changes output filename and skips .NET runtime check |
 
 ## What the MSI does
