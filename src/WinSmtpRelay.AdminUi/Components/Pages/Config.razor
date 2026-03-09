@@ -92,18 +92,29 @@
                         }
                     </tbody>
                 </table>
-                <div class="mt-1">
-                    <span class="text-muted">Max message size:</span> @(SmtpOptions.Value.MaxMessageSizeBytes / 1024 / 1024) MB |
-                    <span class="text-muted">Max connections:</span> @SmtpOptions.Value.MaxConnections |
-                    <span class="text-muted">Allowed networks:</span> @string.Join(", ", SmtpOptions.Value.AllowedNetworks)
-                </div>
-                @if (!string.IsNullOrWhiteSpace(SmtpOptions.Value.PickupFolder))
-                {
-                    <div class="mt-1">
-                        <span class="text-muted">Pickup folder:</span> @SmtpOptions.Value.PickupFolder
-                        (poll every @SmtpOptions.Value.PickupFolderPollIntervalSeconds s)
-                    </div>
-                }
+                <table class="mt-1 kv-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Max message size</td>
+                            <td>@(SmtpOptions.Value.MaxMessageSizeBytes / 1024 / 1024) MB</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Max connections</td>
+                            <td>@SmtpOptions.Value.MaxConnections</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Allowed networks</td>
+                            <td>@string.Join(", ", SmtpOptions.Value.AllowedNetworks)</td>
+                        </tr>
+                        @if (!string.IsNullOrWhiteSpace(SmtpOptions.Value.PickupFolder))
+                        {
+                            <tr>
+                                <td class="text-muted">Pickup folder</td>
+                                <td>@SmtpOptions.Value.PickupFolder (poll every @SmtpOptions.Value.PickupFolderPollIntervalSeconds s)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </BbCardContent>
         </BbCard>
     </BbTabsContent>

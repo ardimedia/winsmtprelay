@@ -178,6 +178,19 @@ nav[aria-label="breadcrumb"] {
     margin-bottom: 0.75rem;
 }
 
+/* Key-value table: label column stays narrow, value wraps */
+.kv-table {
+    border-collapse: collapse;
+}
+.kv-table td {
+    padding: 0.15rem 0;
+    vertical-align: top;
+}
+.kv-table td:first-child {
+    white-space: nowrap;
+    padding-right: 1rem;
+}
+
 /* Badge overrides — less round, slightly larger */
 .badge-status {
     display: inline-flex;
