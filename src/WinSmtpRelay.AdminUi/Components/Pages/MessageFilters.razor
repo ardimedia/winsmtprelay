@@ -2,6 +2,7 @@
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
+@inject IRuntimeConfigCache ConfigCache
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -414,6 +415,7 @@
             SortOrder = nextOrder
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Header rule added";
         newHeaderName = "";
         newHeaderMatch = "";
@@ -449,6 +451,7 @@
             IsEnabled = editHeaderEnabled == "true"
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Header rule updated";
         isEditHeaderOpen = false;
         await RefreshAsync();
@@ -459,6 +462,7 @@
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
         await svc.DeleteHeaderRuleAsync(deleteHeaderId);
+        ConfigCache.Invalidate();
         statusMessage = "Header rule deleted";
         showDeleteHeader = false;
         await RefreshAsync();
@@ -479,6 +483,7 @@
             SortOrder = nextOrder
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Sender rule added";
         newSenderFrom = "";
         newSenderTo = "";
@@ -509,6 +514,7 @@
             IsEnabled = editSenderEnabled == "true"
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Sender rule updated";
         isEditSenderOpen = false;
         await RefreshAsync();
@@ -519,6 +525,7 @@
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
         await svc.DeleteSenderRuleAsync(deleteSenderId);
+        ConfigCache.Invalidate();
         statusMessage = "Sender rule deleted";
         showDeleteSender = false;
         await RefreshAsync();

@@ -2,6 +2,7 @@
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
+@inject IRuntimeConfigCache ConfigCache
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -399,6 +400,7 @@
             SmartHostPort = int.TryParse(newPort, out var p) ? p : 587
         });
 
+        ConfigCache.Invalidate();
         statusMessage = $"Connector '{newName}' created";
         newName = "";
         newSmartHost = "";
@@ -419,6 +421,7 @@
             SortOrder = nextOrder
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Route added";
         newRouteDomain = "";
         await RefreshAsync();
@@ -465,6 +468,7 @@
             IsEnabled = editEnabled == "true"
         });
 
+        ConfigCache.Invalidate();
         statusMessage = "Connector updated";
         isEditOpen = false;
         await RefreshAsync();
@@ -475,6 +479,7 @@
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<ISendConnectorService>();
         await svc.DeleteAsync(deleteTargetId);
+        ConfigCache.Invalidate();
         statusMessage = "Connector deleted";
         showDeleteConfirm = false;
         await RefreshAsync();
@@ -485,6 +490,7 @@
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IDomainRouteService>();
         await svc.DeleteAsync(deleteRouteId);
+        ConfigCache.Invalidate();
         statusMessage = "Route deleted";
         showDeleteRouteConfirm = false;
         await RefreshAsync();

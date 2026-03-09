@@ -2,6 +2,7 @@
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @inject IServiceScopeFactory ScopeFactory
+@inject IRuntimeConfigCache ConfigCache
 
 <BbBreadcrumb>
     <BbBreadcrumbList>
@@ -10,18 +11,18 @@
         </BbBreadcrumbItem>
         <BbBreadcrumbSeparator />
         <BbBreadcrumbItem>
-            <BbBreadcrumbPage>Accepted Domains</BbBreadcrumbPage>
+            <BbBreadcrumbPage>Accepted Domains (Recipient)</BbBreadcrumbPage>
         </BbBreadcrumbItem>
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
 <div class="page-header page-header-row">
     <div>
-        <h1>Accepted Domains</h1>
-        <p>Domains the relay accepts mail for. If empty, all domains are accepted.</p>
+        <h1>Accepted Domains (Recipient)</h1>
+        <p>Recipient domains the relay accepts mail for. If empty, all recipient domains are accepted.</p>
     </div>
     <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
-        <LucideIcon Name="info" /> About Accepted Domains
+        <LucideIcon Name="info" /> About
     </BbButton>
 </div>
 
@@ -109,13 +110,13 @@ else
 <BbDialog @bind-Open="showHelp">
     <BbDialogContent>
         <BbDialogHeader>
-            <BbDialogTitle>About Accepted Domains</BbDialogTitle>
-            <BbDialogDescription>Which domains the relay will accept mail for</BbDialogDescription>
+            <BbDialogTitle>About Accepted Domains (Recipient)</BbDialogTitle>
+            <BbDialogDescription>Which recipient domains the relay will accept mail for</BbDialogDescription>
         </BbDialogHeader>
         <div style="font-size:0.875rem;line-height:1.6;">
-            <p>Accepted domains define which recipient domains the relay will accept during the SMTP <code>RCPT TO</code> command.</p>
-            <p>If the list is <strong>empty</strong>, the relay accepts mail for <em>all</em> domains (open relay for authenticated users).</p>
-            <p>If one or more domains are listed, only recipients at those domains are accepted. All other recipients are rejected with a 550 error.</p>
+            <p>Accepted recipient domains define which recipient domain addresses the relay will accept during the SMTP <code>RCPT TO</code> command.</p>
+            <p>If the list is <strong>empty</strong>, the relay accepts mail for <em>all</em> recipient domains (open relay for authenticated users).</p>
+            <p>If one or more domains are listed, only recipients at those domains are accepted. All other recipient domain addresses are rejected with a 550 error.</p>
         </div>
         <BbDialogFooter>
             <BbDialogClose>
@@ -157,6 +158,7 @@ else
         }
 
         await svc.CreateAsync(newDomain);
+        ConfigCache.Invalidate();
         statusMessage = $"Domain '{newDomain}' added";
         newDomain = "";
         await RefreshAsync();
@@ -167,6 +169,7 @@ else
         using var scope = ScopeFactory.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IAcceptedDomainService>();
         await svc.DeleteAsync(deleteTargetId);
+        ConfigCache.Invalidate();
         statusMessage = "Domain deleted";
         showDeleteConfirm = false;
         await RefreshAsync();
