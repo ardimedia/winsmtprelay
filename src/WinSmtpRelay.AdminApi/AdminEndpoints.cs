@@ -26,6 +26,16 @@ public static class AdminEndpoints
         MapServerEndpoints(group);
         MapStatisticsEndpoints(group);
 
+        // Configuration endpoints
+        MapReceiveConnectorEndpoints(group);
+        MapAcceptedDomainEndpoints(group);
+        MapIpAccessRuleEndpoints(group);
+        MapSendConnectorEndpoints(group);
+        MapDomainRouteEndpoints(group);
+        MapDkimDomainEndpoints(group);
+        MapRateLimitEndpoints(group);
+        MapMessageFilterEndpoints(group);
+
         return endpoints;
     }
 
@@ -235,6 +245,230 @@ public static class AdminEndpoints
         stats.MapGet("/monthly", async (IStatisticsService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetMonthlyStatisticsAsync(ct)));
     }
+
+    private static void MapReceiveConnectorEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/connectors/receive");
+
+        ep.MapGet("/", async (IReceiveConnectorService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (ReceiveConnector connector, IReceiveConnectorService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateAsync(connector, ct);
+            return Results.Created($"/api/connectors/receive/{created.Id}", created);
+        });
+
+        ep.MapPut("/{id:int}", async (int id, ReceiveConnector connector, IReceiveConnectorService svc, CancellationToken ct) =>
+        {
+            connector.Id = id;
+            await svc.UpdateAsync(connector, ct);
+            return Results.Ok(new { Message = "Receive connector updated" });
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IReceiveConnectorService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "Receive connector deleted" });
+        });
+    }
+
+    private static void MapAcceptedDomainEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/domains/accepted");
+
+        ep.MapGet("/", async (IAcceptedDomainService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (CreateAcceptedDomainRequest req, IAcceptedDomainService svc, CancellationToken ct) =>
+        {
+            if (await svc.ExistsAsync(req.Domain, ct))
+                return Results.Conflict(new { Error = $"Domain '{req.Domain}' already exists" });
+            var created = await svc.CreateAsync(req.Domain, ct);
+            return Results.Created($"/api/domains/accepted/{created.Id}", created);
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IAcceptedDomainService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "Accepted domain deleted" });
+        });
+    }
+
+    private static void MapIpAccessRuleEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/ip-rules");
+
+        ep.MapGet("/", async (IIpAccessRuleService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (IpAccessRule rule, IIpAccessRuleService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateAsync(rule, ct);
+            return Results.Created($"/api/ip-rules/{created.Id}", created);
+        });
+
+        ep.MapPut("/{id:int}", async (int id, IpAccessRule rule, IIpAccessRuleService svc, CancellationToken ct) =>
+        {
+            rule.Id = id;
+            await svc.UpdateAsync(rule, ct);
+            return Results.Ok(new { Message = "IP access rule updated" });
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IIpAccessRuleService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "IP access rule deleted" });
+        });
+    }
+
+    private static void MapSendConnectorEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/connectors/send");
+
+        ep.MapGet("/", async (ISendConnectorService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (SendConnector connector, ISendConnectorService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateAsync(connector, ct);
+            return Results.Created($"/api/connectors/send/{created.Id}", created);
+        });
+
+        ep.MapPut("/{id:int}", async (int id, SendConnector connector, ISendConnectorService svc, CancellationToken ct) =>
+        {
+            connector.Id = id;
+            await svc.UpdateAsync(connector, ct);
+            return Results.Ok(new { Message = "Send connector updated" });
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, ISendConnectorService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "Send connector deleted" });
+        });
+    }
+
+    private static void MapDomainRouteEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/routes");
+
+        ep.MapGet("/", async (IDomainRouteService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (DomainRoute route, IDomainRouteService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateAsync(route, ct);
+            return Results.Created($"/api/routes/{created.Id}", created);
+        });
+
+        ep.MapPut("/{id:int}", async (int id, DomainRoute route, IDomainRouteService svc, CancellationToken ct) =>
+        {
+            route.Id = id;
+            await svc.UpdateAsync(route, ct);
+            return Results.Ok(new { Message = "Domain route updated" });
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IDomainRouteService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "Domain route deleted" });
+        });
+    }
+
+    private static void MapDkimDomainEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/dkim/domains");
+
+        ep.MapGet("/", async (IDkimDomainService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (DkimDomain dkim, IDkimDomainService svc, CancellationToken ct) =>
+        {
+            if (await svc.GetByDomainAsync(dkim.Domain, ct) is not null)
+                return Results.Conflict(new { Error = $"DKIM config for '{dkim.Domain}' already exists" });
+            var created = await svc.CreateAsync(dkim, ct);
+            return Results.Created($"/api/dkim/domains/{created.Id}", created);
+        });
+
+        ep.MapPut("/{id:int}", async (int id, DkimDomain dkim, IDkimDomainService svc, CancellationToken ct) =>
+        {
+            dkim.Id = id;
+            await svc.UpdateAsync(dkim, ct);
+            return Results.Ok(new { Message = "DKIM domain updated" });
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IDkimDomainService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            return Results.Ok(new { Message = "DKIM domain deleted" });
+        });
+    }
+
+    private static void MapRateLimitEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/rate-limits");
+
+        ep.MapGet("/", async (IRateLimitSettingsService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAsync(ct)));
+
+        ep.MapPut("/", async (RateLimitSettings settings, IRateLimitSettingsService svc, CancellationToken ct) =>
+        {
+            await svc.UpdateAsync(settings, ct);
+            return Results.Ok(new { Message = "Rate limit settings updated" });
+        });
+    }
+
+    private static void MapMessageFilterEndpoints(RouteGroupBuilder group)
+    {
+        var headers = group.MapGroup("/filters/headers");
+
+        headers.MapGet("/", async (IMessageFilterService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetHeaderRulesAsync(ct)));
+
+        headers.MapPost("/", async (HeaderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateHeaderRuleAsync(rule, ct);
+            return Results.Created($"/api/filters/headers/{created.Id}", created);
+        });
+
+        headers.MapPut("/{id:int}", async (int id, HeaderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            rule.Id = id;
+            await svc.UpdateHeaderRuleAsync(rule, ct);
+            return Results.Ok(new { Message = "Header rewrite rule updated" });
+        });
+
+        headers.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteHeaderRuleAsync(id, ct);
+            return Results.Ok(new { Message = "Header rewrite rule deleted" });
+        });
+
+        var senders = group.MapGroup("/filters/senders");
+
+        senders.MapGet("/", async (IMessageFilterService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetSenderRulesAsync(ct)));
+
+        senders.MapPost("/", async (SenderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            var created = await svc.CreateSenderRuleAsync(rule, ct);
+            return Results.Created($"/api/filters/senders/{created.Id}", created);
+        });
+
+        senders.MapPut("/{id:int}", async (int id, SenderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            rule.Id = id;
+            await svc.UpdateSenderRuleAsync(rule, ct);
+            return Results.Ok(new { Message = "Sender rewrite rule updated" });
+        });
+
+        senders.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteSenderRuleAsync(id, ct);
+            return Results.Ok(new { Message = "Sender rewrite rule deleted" });
+        });
+    }
 }
 
 public record QueueStatusResponse(int Depth);
@@ -259,3 +493,5 @@ public record DkimGenerateRequest(string Domain, string Selector, int KeySize = 
 public record DeliveryLogSummary(
     long Id, long QueuedMessageId, string Recipient, string StatusCode,
     string StatusMessage, string? RemoteServer, DateTime TimestampUtc);
+
+public record CreateAcceptedDomainRequest(string Domain);

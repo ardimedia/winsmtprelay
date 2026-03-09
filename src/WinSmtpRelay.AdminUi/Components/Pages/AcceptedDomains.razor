@@ -1,0 +1,174 @@
+@page "/domains"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Accepted Domains</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Accepted Domains</h1>
+        <p>Domains the relay accepts mail for. If empty, all domains are accepted.</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About Accepted Domains
+    </BbButton>
+</div>
+
+<div style="max-width:400px;">
+<BbCard Class="mb-1">
+    <BbCardHeader>
+        <BbCardTitle>Add Domain</BbCardTitle>
+    </BbCardHeader>
+    <BbCardContent>
+        <div class="form-group">
+            <BbLabel>Domain</BbLabel>
+            <BbInput @bind-Value="newDomain" Placeholder="example.com" />
+        </div>
+    </BbCardContent>
+    <BbCardFooter>
+        <BbButton Variant="ButtonVariant.Default" @onclick="CreateAsync"
+                Disabled="@string.IsNullOrWhiteSpace(newDomain)">
+            <LucideIcon Name="plus" /> Add
+        </BbButton>
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <span class="text-muted" style="margin-left:1rem">@statusMessage</span>
+        }
+    </BbCardFooter>
+</BbCard>
+</div>
+
+@if (isLoading)
+{
+    <BbSkeleton Class="h-[200px] w-full" />
+}
+else
+{
+    <BbTable Data="@domains">
+        <BbTableHeader>
+            <BbTableRow TData="AcceptedDomain">
+                <BbTableHeaderCell TData="AcceptedDomain">ID</BbTableHeaderCell>
+                <BbTableHeaderCell TData="AcceptedDomain">Domain</BbTableHeaderCell>
+                <BbTableHeaderCell TData="AcceptedDomain">Added</BbTableHeaderCell>
+                <BbTableHeaderCell TData="AcceptedDomain">Actions</BbTableHeaderCell>
+            </BbTableRow>
+        </BbTableHeader>
+        <BbTableBody>
+            @if (domains.Count == 0)
+            {
+                <BbTableRow TData="AcceptedDomain">
+                    <BbTableCell colspan="4" style="text-align:center;">No accepted domains configured &mdash; all domains are accepted</BbTableCell>
+                </BbTableRow>
+            }
+            @foreach (var d in domains)
+            {
+                <BbTableRow Item="@d">
+                    <BbTableCell>@d.Id</BbTableCell>
+                    <BbTableCell>@d.Domain</BbTableCell>
+                    <BbTableCell>@d.CreatedUtc.ToString("yyyy-MM-dd")</BbTableCell>
+                    <BbTableCell>
+                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost"
+                                @onclick="() => { deleteTargetId = d.Id; showDeleteConfirm = true; }">
+                            <LucideIcon Name="trash-2" />
+                        </BbButton>
+                    </BbTableCell>
+                </BbTableRow>
+            }
+        </BbTableBody>
+    </BbTable>
+}
+
+<BbAlertDialog @bind-Open="showDeleteConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Domain</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will remove this domain from the accepted list. Mail for this domain will be rejected.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Accepted Domains</BbDialogTitle>
+            <BbDialogDescription>Which domains the relay will accept mail for</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>Accepted domains define which recipient domains the relay will accept during the SMTP <code>RCPT TO</code> command.</p>
+            <p>If the list is <strong>empty</strong>, the relay accepts mail for <em>all</em> domains (open relay for authenticated users).</p>
+            <p>If one or more domains are listed, only recipients at those domains are accepted. All other recipients are rejected with a 550 error.</p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private IReadOnlyList<AcceptedDomain> domains = [];
+    private string newDomain = "";
+    private string? statusMessage;
+    private bool isLoading = true;
+    private bool showHelp;
+    private bool showDeleteConfirm;
+    private int deleteTargetId;
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true;
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAcceptedDomainService>();
+        domains = await svc.GetAllAsync();
+        isLoading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAcceptedDomainService>();
+
+        if (await svc.ExistsAsync(newDomain))
+        {
+            statusMessage = $"Domain '{newDomain}' already exists";
+            return;
+        }
+
+        await svc.CreateAsync(newDomain);
+        statusMessage = $"Domain '{newDomain}' added";
+        newDomain = "";
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAcceptedDomainService>();
+        await svc.DeleteAsync(deleteTargetId);
+        statusMessage = "Domain deleted";
+        showDeleteConfirm = false;
+        await RefreshAsync();
+    }
+}

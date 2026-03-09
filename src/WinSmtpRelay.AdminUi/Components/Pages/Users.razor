@@ -1,4 +1,4 @@
-@page "/users"
+@page "/smtpusers"
 @using WinSmtpRelay.Core.Interfaces
 @using WinSmtpRelay.Core.Models
 @using WinSmtpRelay.Storage
@@ -12,14 +12,14 @@
         </BbBreadcrumbItem>
         <BbBreadcrumbSeparator />
         <BbBreadcrumbItem>
-            <BbBreadcrumbPage>Users</BbBreadcrumbPage>
+            <BbBreadcrumbPage>SMTP Users</BbBreadcrumbPage>
         </BbBreadcrumbItem>
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
 <div class="page-header page-header-row">
     <div>
-        <h1>User Management</h1>
+        <h1>SMTP Users</h1>
         <p>SMTP relay user accounts and permissions</p>
     </div>
     <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelpDialog = true">

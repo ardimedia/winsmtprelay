@@ -1,4 +1,4 @@
-@page "/config"
+@page "/startupconfig"
 @using Microsoft.Extensions.Options
 @using System.Net
 @using System.Net.NetworkInformation
@@ -21,13 +21,13 @@
         </BbBreadcrumbItem>
         <BbBreadcrumbSeparator />
         <BbBreadcrumbItem>
-            <BbBreadcrumbPage>Configuration</BbBreadcrumbPage>
+            <BbBreadcrumbPage>Startup Config</BbBreadcrumbPage>
         </BbBreadcrumbItem>
     </BbBreadcrumbList>
 </BbBreadcrumb>
 
 <div class="page-header">
-    <h1>Configuration</h1>
+    <h1>Startup Config</h1>
     <p>Read-only view of appsettings.json. Edit the file and restart the service to apply changes.</p>
 </div>
 
@@ -123,20 +123,30 @@
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>Delivery</BbCardTitle></BbCardHeader>
             <BbCardContent>
-                <div>
-                    <span class="text-muted">Concurrent deliveries:</span> @DeliveryOpts.Value.MaxConcurrentDeliveries |
-                    <span class="text-muted">Max retry:</span> @DeliveryOpts.Value.MaxRetryHours h |
-                    <span class="text-muted">Opportunistic TLS:</span> @DeliveryOpts.Value.OpportunisticTls
-                </div>
-                @if (!string.IsNullOrWhiteSpace(DeliveryOpts.Value.SmartHost))
-                {
-                    <div class="mt-1">
-                        <span class="text-muted">Smart host:</span> @DeliveryOpts.Value.SmartHost:@DeliveryOpts.Value.SmartHostPort
-                    </div>
-                }
-                <div class="mt-1 text-muted" style="font-size:0.8rem">
-                    Retry intervals: @string.Join(", ", DeliveryOpts.Value.RetryIntervalsMinutes.Select(m => $"{m}m"))
-                </div>
+                <table class="kv-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Concurrent deliveries</td>
+                            <td>@DeliveryOpts.Value.MaxConcurrentDeliveries</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Max retry</td>
+                            <td>@DeliveryOpts.Value.MaxRetryHours h</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Opportunistic TLS</td>
+                            <td>@DeliveryOpts.Value.OpportunisticTls</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Smart host</td>
+                            <td>@(string.IsNullOrWhiteSpace(DeliveryOpts.Value.SmartHost) ? "—" : $"{DeliveryOpts.Value.SmartHost}:{DeliveryOpts.Value.SmartHostPort}")</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Retry intervals</td>
+                            <td>@string.Join(", ", DeliveryOpts.Value.RetryIntervalsMinutes.Select(m => $"{m}m"))</td>
+                        </tr>
+                    </tbody>
+                </table>
             </BbCardContent>
         </BbCard>
 
@@ -209,13 +219,30 @@
         <BbCard Class="mb-1">
             <BbCardHeader><BbCardTitle>Rate Limiting</BbCardTitle></BbCardHeader>
             <BbCardContent>
-                <div>
-                    <span class="text-muted">Per-IP:</span> @RateLimitOpts.Value.MaxConnectionsPerIpPerMinute /min |
-                    <span class="text-muted">Per-sender:</span> @RateLimitOpts.Value.MaxMessagesPerSenderPerMinute /min, @RateLimitOpts.Value.MaxMessagesPerSenderPerDay /day
-                </div>
-                <div class="mt-1">
-                    <span class="text-muted">Failed auth ban:</span> after @RateLimitOpts.Value.FailedAuthBanThreshold attempts, ban for @RateLimitOpts.Value.FailedAuthBanMinutes min
-                </div>
+                <table class="kv-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Max connections per IP per minute</td>
+                            <td>@RateLimitOpts.Value.MaxConnectionsPerIpPerMinute</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Max messages per sender per minute</td>
+                            <td>@RateLimitOpts.Value.MaxMessagesPerSenderPerMinute</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Max messages per sender per day</td>
+                            <td>@RateLimitOpts.Value.MaxMessagesPerSenderPerDay</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Failed auth ban threshold</td>
+                            <td>@RateLimitOpts.Value.FailedAuthBanThreshold attempts</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Failed auth ban duration</td>
+                            <td>@RateLimitOpts.Value.FailedAuthBanMinutes min</td>
+                        </tr>
+                    </tbody>
+                </table>
             </BbCardContent>
         </BbCard>
     </BbTabsContent>
@@ -329,16 +356,23 @@
         <BbCard>
             <BbCardHeader><BbCardTitle>Admin UI</BbCardTitle></BbCardHeader>
             <BbCardContent>
-                <div>
-                    <span class="text-muted">Bind:</span> @AdminOpts.Value.BindAddress:@AdminOpts.Value.Port
-                </div>
-                <div class="mt-1">
-                    <span class="text-muted">Reachable at:</span>
-                    @foreach (var url in GetReachableUrls())
-                    {
-                        <span class="mono" style="margin-right:1rem;">@url</span>
-                    }
-                </div>
+                <table class="kv-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Bind address</td>
+                            <td class="mono">@AdminOpts.Value.BindAddress:@AdminOpts.Value.Port</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Reachable at</td>
+                            <td>
+                                @foreach (var url in GetReachableUrls())
+                                {
+                                    <span class="mono" style="margin-right:1rem;">@url</span>
+                                }
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </BbCardContent>
         </BbCard>
     </BbTabsContent>

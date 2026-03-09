@@ -49,18 +49,66 @@
             </BbSidebarGroup>
 
             <BbSidebarGroup>
-                <BbSidebarGroupLabel>Admin</BbSidebarGroupLabel>
+                <BbSidebarGroupLabel>Configuration</BbSidebarGroupLabel>
                 <BbSidebarMenu>
                     <BbSidebarMenuItem>
-                        <BbSidebarMenuButton Href="users">
-                            <LucideIcon Name="users" />
-                            <span>Users</span>
+                        <BbSidebarMenuButton Href="connectors/receive">
+                            <LucideIcon Name="plug" />
+                            <span>Receive Connectors</span>
                         </BbSidebarMenuButton>
                     </BbSidebarMenuItem>
                     <BbSidebarMenuItem>
-                        <BbSidebarMenuButton Href="config">
+                        <BbSidebarMenuButton Href="connectors/send">
+                            <LucideIcon Name="send" />
+                            <span>Send Connectors</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="domains">
+                            <LucideIcon Name="globe" />
+                            <span>Accepted Domains</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="ip-rules">
+                            <LucideIcon Name="shield" />
+                            <span>IP Access Rules</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="dkim">
+                            <LucideIcon Name="shield-check" />
+                            <span>DKIM</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="rate-limits">
+                            <LucideIcon Name="gauge" />
+                            <span>Rate Limits</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="filters">
+                            <LucideIcon Name="filter" />
+                            <span>Message Filters</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="smtpusers">
+                            <LucideIcon Name="users" />
+                            <span>SMTP Users</span>
+                        </BbSidebarMenuButton>
+                    </BbSidebarMenuItem>
+                </BbSidebarMenu>
+            </BbSidebarGroup>
+
+            <BbSidebarGroup>
+                <BbSidebarGroupLabel>Admin</BbSidebarGroupLabel>
+                <BbSidebarMenu>
+                    <BbSidebarMenuItem>
+                        <BbSidebarMenuButton Href="startupconfig">
                             <LucideIcon Name="settings" />
-                            <span>Configuration</span>
+                            <span>Startup Config</span>
                         </BbSidebarMenuButton>
                     </BbSidebarMenuItem>
                     <BbSidebarMenuItem>

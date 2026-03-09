@@ -1,0 +1,282 @@
+@page "/dkim"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>DKIM</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>DKIM Configuration</h1>
+        <p>Per-domain DKIM signing keys and settings</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About DKIM
+    </BbButton>
+</div>
+
+<div style="max-width:500px;">
+<BbCard Class="mb-1">
+    <BbCardHeader>
+        <BbCardTitle>Add DKIM Domain</BbCardTitle>
+    </BbCardHeader>
+    <BbCardContent>
+        <div class="form-group">
+            <BbLabel>Domain</BbLabel>
+            <BbInput @bind-Value="newDomain" Placeholder="example.com" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Selector</BbLabel>
+            <BbInput @bind-Value="newSelector" Placeholder="default" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Private Key Path</BbLabel>
+            <BbInput @bind-Value="newKeyPath" Placeholder="C:\dkim\example.com.pem" />
+        </div>
+    </BbCardContent>
+    <BbCardFooter>
+        <BbButton Variant="ButtonVariant.Default" @onclick="CreateAsync"
+                Disabled="@(string.IsNullOrWhiteSpace(newDomain) || string.IsNullOrWhiteSpace(newSelector) || string.IsNullOrWhiteSpace(newKeyPath))">
+            <LucideIcon Name="plus" /> Add
+        </BbButton>
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <span class="text-muted" style="margin-left:1rem">@statusMessage</span>
+        }
+    </BbCardFooter>
+</BbCard>
+</div>
+
+@if (isLoading)
+{
+    <BbSkeleton Class="h-[300px] w-full" />
+}
+else
+{
+    <BbTable Data="@dkimDomains">
+        <BbTableHeader>
+            <BbTableRow TData="DkimDomain">
+                <BbTableHeaderCell TData="DkimDomain">Domain</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DkimDomain">Selector</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DkimDomain">Key Path</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DkimDomain">Enabled</BbTableHeaderCell>
+                <BbTableHeaderCell TData="DkimDomain">Actions</BbTableHeaderCell>
+            </BbTableRow>
+        </BbTableHeader>
+        <BbTableBody>
+            @if (dkimDomains.Count == 0)
+            {
+                <BbTableRow TData="DkimDomain">
+                    <BbTableCell colspan="5" style="text-align:center;">No DKIM domains configured</BbTableCell>
+                </BbTableRow>
+            }
+            @foreach (var d in dkimDomains)
+            {
+                <BbTableRow Item="@d">
+                    <BbTableCell>@d.Domain</BbTableCell>
+                    <BbTableCell>@d.Selector</BbTableCell>
+                    <BbTableCell style="max-width:250px;overflow:hidden;text-overflow:ellipsis;">@d.PrivateKeyPath</BbTableCell>
+                    <BbTableCell><span class="badge-status @(d.IsEnabled ? "badge-success" : "badge-muted")">@(d.IsEnabled ? "Yes" : "No")</span></BbTableCell>
+                    <BbTableCell>
+                        <BbDropdownMenu>
+                            <BbDropdownMenuTrigger>
+                                <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost">
+                                    <LucideIcon Name="ellipsis" />
+                                </BbButton>
+                            </BbDropdownMenuTrigger>
+                            <BbDropdownMenuContent>
+                                <BbDropdownMenuItem @onclick="() => StartEdit(d)">
+                                    <LucideIcon Name="pencil" /> Edit
+                                </BbDropdownMenuItem>
+                                <BbDropdownMenuSeparator />
+                                <BbDropdownMenuItem @onclick="() => { deleteTargetId = d.Id; showDeleteConfirm = true; }">
+                                    <LucideIcon Name="trash-2" /> Delete
+                                </BbDropdownMenuItem>
+                            </BbDropdownMenuContent>
+                        </BbDropdownMenu>
+                    </BbTableCell>
+                </BbTableRow>
+            }
+        </BbTableBody>
+    </BbTable>
+}
+
+<BbDialog @bind-Open="isEditOpen">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit DKIM: @editDomain</BbDialogTitle>
+            <BbDialogDescription>Modify DKIM signing configuration</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="form-group">
+            <BbLabel>Domain</BbLabel>
+            <BbInput @bind-Value="editDomain" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Selector</BbLabel>
+            <BbInput @bind-Value="editSelector" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Private Key Path</BbLabel>
+            <BbInput @bind-Value="editKeyPath" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Enabled</BbLabel>
+            <BbNativeSelect @bind-Value="editEnabled">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </BbNativeSelect>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbDialogClose>
+            <BbButton Variant="ButtonVariant.Default" @onclick="SaveEditAsync">Save</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbAlertDialog @bind-Open="showDeleteConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete DKIM Domain</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will remove DKIM signing for this domain. Outbound messages will no longer be signed.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About DKIM</BbDialogTitle>
+            <BbDialogDescription>DomainKeys Identified Mail signing</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>DKIM adds a cryptographic signature to outbound emails, allowing receiving servers to verify that the message was sent by an authorized server for that domain.</p>
+            <h4 style="margin-top:1rem;">Setup</h4>
+            <ol style="padding-left:1.25rem;">
+                <li>Generate a DKIM key pair (use the <code>/api/dkim/generate</code> API endpoint).</li>
+                <li>Save the private key file to the server.</li>
+                <li>Add the public key as a DNS TXT record at <code>selector._domainkey.domain</code>.</li>
+                <li>Add the domain configuration here with the selector and private key path.</li>
+            </ol>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private IReadOnlyList<DkimDomain> dkimDomains = [];
+    private bool isLoading = true;
+    private bool showHelp;
+    private bool isEditOpen;
+    private bool showDeleteConfirm;
+    private int deleteTargetId;
+    private string? statusMessage;
+
+    private string newDomain = "";
+    private string newSelector = "default";
+    private string newKeyPath = "";
+
+    private int editId;
+    private string editDomain = "";
+    private string editSelector = "";
+    private string editKeyPath = "";
+    private string editEnabled = "true";
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true;
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDkimDomainService>();
+        dkimDomains = await svc.GetAllAsync();
+        isLoading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDkimDomainService>();
+
+        if (await svc.GetByDomainAsync(newDomain) is not null)
+        {
+            statusMessage = $"DKIM for '{newDomain}' already exists";
+            return;
+        }
+
+        await svc.CreateAsync(new DkimDomain
+        {
+            Domain = newDomain.ToLowerInvariant().Trim(),
+            Selector = newSelector.Trim(),
+            PrivateKeyPath = newKeyPath.Trim()
+        });
+
+        statusMessage = $"DKIM domain '{newDomain}' added";
+        newDomain = "";
+        newSelector = "default";
+        newKeyPath = "";
+        await RefreshAsync();
+    }
+
+    private void StartEdit(DkimDomain d)
+    {
+        editId = d.Id;
+        editDomain = d.Domain;
+        editSelector = d.Selector;
+        editKeyPath = d.PrivateKeyPath;
+        editEnabled = d.IsEnabled.ToString().ToLowerInvariant();
+        isEditOpen = true;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDkimDomainService>();
+
+        await svc.UpdateAsync(new DkimDomain
+        {
+            Id = editId,
+            Domain = editDomain.ToLowerInvariant().Trim(),
+            Selector = editSelector.Trim(),
+            PrivateKeyPath = editKeyPath.Trim(),
+            IsEnabled = editEnabled == "true"
+        });
+
+        statusMessage = "DKIM domain updated";
+        isEditOpen = false;
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDkimDomainService>();
+        await svc.DeleteAsync(deleteTargetId);
+        statusMessage = "DKIM domain deleted";
+        showDeleteConfirm = false;
+        await RefreshAsync();
+    }
+}

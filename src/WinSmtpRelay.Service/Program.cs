@@ -70,6 +70,7 @@ if (adminUiConfig.Enabled)
     builder.Services.AddHttpClient();
     builder.Services.AddHostedService<WinSmtpRelay.Service.TrayIconService>();
     builder.Services.AddHostedService<WinSmtpRelay.Service.StatisticsAggregator>();
+    builder.Services.AddHostedService<WinSmtpRelay.Storage.ConfigurationSeeder>();
 }
 
 var app = builder.Build();

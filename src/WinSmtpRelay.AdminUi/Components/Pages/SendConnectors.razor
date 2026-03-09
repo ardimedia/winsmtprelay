@@ -1,0 +1,492 @@
+@page "/connectors/send"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Send Connectors</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Send Connectors</h1>
+        <p>Outbound delivery routes, smart hosts and domain routing</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About Send Connectors
+    </BbButton>
+</div>
+
+<BbTabs DefaultValue="connectors" @bind-Value="activeTab">
+    <BbTabsList>
+        <BbTabsTrigger Value="connectors">Send Connectors</BbTabsTrigger>
+        <BbTabsTrigger Value="routes">Domain Routes</BbTabsTrigger>
+    </BbTabsList>
+
+    <BbTabsContent Value="connectors">
+        <div style="max-width:500px;">
+        <BbCard Class="mb-1">
+            <BbCardHeader>
+                <BbCardTitle>Create Send Connector</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="form-group">
+                    <BbLabel>Name</BbLabel>
+                    <BbInput @bind-Value="newName" Placeholder="Default" />
+                </div>
+                <div style="display:flex;gap:1rem;">
+                    <div class="form-group" style="flex:2">
+                        <BbLabel>Smart Host (empty = direct MX)</BbLabel>
+                        <BbInput @bind-Value="newSmartHost" Placeholder="smtp.example.com" />
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <BbLabel>Port</BbLabel>
+                        <BbInput Type="InputType.Number" @bind-Value="newPort" />
+                    </div>
+                </div>
+            </BbCardContent>
+            <BbCardFooter>
+                <BbButton Variant="ButtonVariant.Default" @onclick="CreateConnectorAsync"
+                        Disabled="@string.IsNullOrWhiteSpace(newName)">
+                    <LucideIcon Name="plus" /> Create
+                </BbButton>
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <span class="text-muted" style="margin-left:1rem">@statusMessage</span>
+                }
+            </BbCardFooter>
+        </BbCard>
+        </div>
+
+        @if (isLoading)
+        {
+            <BbSkeleton Class="h-[300px] w-full" />
+        }
+        else
+        {
+            <BbTable Data="@connectors">
+                <BbTableHeader>
+                    <BbTableRow TData="SendConnector">
+                        <BbTableHeaderCell TData="SendConnector">Name</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">Smart Host</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">TLS</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">Default</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">Concurrency</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">Enabled</BbTableHeaderCell>
+                        <BbTableHeaderCell TData="SendConnector">Actions</BbTableHeaderCell>
+                    </BbTableRow>
+                </BbTableHeader>
+                <BbTableBody>
+                    @if (connectors.Count == 0)
+                    {
+                        <BbTableRow TData="SendConnector">
+                            <BbTableCell colspan="7" style="text-align:center;">No send connectors configured</BbTableCell>
+                        </BbTableRow>
+                    }
+                    @foreach (var c in connectors)
+                    {
+                        <BbTableRow Item="@c">
+                            <BbTableCell>@c.Name</BbTableCell>
+                            <BbTableCell>@(string.IsNullOrEmpty(c.SmartHost) ? "Direct MX" : $"{c.SmartHost}:{c.SmartHostPort}")</BbTableCell>
+                            <BbTableCell>
+                                @if (c.RequireTls) { <span>Required</span> }
+                                else if (c.OpportunisticTls) { <span>Opportunistic</span> }
+                                else { <span class="text-muted">None</span> }
+                            </BbTableCell>
+                            <BbTableCell><span class="badge-status @(c.IsDefault ? "badge-success" : "badge-muted")">@(c.IsDefault ? "Yes" : "No")</span></BbTableCell>
+                            <BbTableCell>@c.MaxConcurrentDeliveries</BbTableCell>
+                            <BbTableCell><span class="badge-status @(c.IsEnabled ? "badge-success" : "badge-muted")">@(c.IsEnabled ? "Yes" : "No")</span></BbTableCell>
+                            <BbTableCell>
+                                <BbDropdownMenu>
+                                    <BbDropdownMenuTrigger>
+                                        <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost">
+                                            <LucideIcon Name="ellipsis" />
+                                        </BbButton>
+                                    </BbDropdownMenuTrigger>
+                                    <BbDropdownMenuContent>
+                                        <BbDropdownMenuItem @onclick="() => StartEditConnector(c)">
+                                            <LucideIcon Name="pencil" /> Edit
+                                        </BbDropdownMenuItem>
+                                        <BbDropdownMenuSeparator />
+                                        <BbDropdownMenuItem @onclick="() => { deleteTargetId = c.Id; showDeleteConfirm = true; }">
+                                            <LucideIcon Name="trash-2" /> Delete
+                                        </BbDropdownMenuItem>
+                                    </BbDropdownMenuContent>
+                                </BbDropdownMenu>
+                            </BbTableCell>
+                        </BbTableRow>
+                    }
+                </BbTableBody>
+            </BbTable>
+        }
+    </BbTabsContent>
+
+    <BbTabsContent Value="routes">
+        <div style="max-width:500px;">
+        <BbCard Class="mb-1">
+            <BbCardHeader>
+                <BbCardTitle>Add Domain Route</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="form-group">
+                    <BbLabel>Domain Pattern</BbLabel>
+                    <BbInput @bind-Value="newRouteDomain" Placeholder="*.example.com" />
+                </div>
+                <div class="form-group">
+                    <BbLabel>Send Connector</BbLabel>
+                    <BbNativeSelect @bind-Value="newRouteConnectorId">
+                        @foreach (var c in connectors)
+                        {
+                            <option value="@c.Id">@c.Name</option>
+                        }
+                    </BbNativeSelect>
+                </div>
+            </BbCardContent>
+            <BbCardFooter>
+                <BbButton Variant="ButtonVariant.Default" @onclick="CreateRouteAsync"
+                        Disabled="@string.IsNullOrWhiteSpace(newRouteDomain)">
+                    <LucideIcon Name="plus" /> Add Route
+                </BbButton>
+            </BbCardFooter>
+        </BbCard>
+        </div>
+
+        <BbTable Data="@routes">
+            <BbTableHeader>
+                <BbTableRow TData="DomainRoute">
+                    <BbTableHeaderCell TData="DomainRoute">Order</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="DomainRoute">Domain Pattern</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="DomainRoute">Send Connector</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="DomainRoute">Actions</BbTableHeaderCell>
+                </BbTableRow>
+            </BbTableHeader>
+            <BbTableBody>
+                @if (routes.Count == 0)
+                {
+                    <BbTableRow TData="DomainRoute">
+                        <BbTableCell colspan="4" style="text-align:center;">No domain routes &mdash; all mail uses the default connector</BbTableCell>
+                    </BbTableRow>
+                }
+                @foreach (var r in routes)
+                {
+                    <BbTableRow Item="@r">
+                        <BbTableCell>@r.SortOrder</BbTableCell>
+                        <BbTableCell><code>@r.DomainPattern</code></BbTableCell>
+                        <BbTableCell>@(r.SendConnector?.Name ?? $"ID {r.SendConnectorId}")</BbTableCell>
+                        <BbTableCell>
+                            <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost"
+                                    @onclick="() => { deleteRouteId = r.Id; showDeleteRouteConfirm = true; }">
+                                <LucideIcon Name="trash-2" />
+                            </BbButton>
+                        </BbTableCell>
+                    </BbTableRow>
+                }
+            </BbTableBody>
+        </BbTable>
+    </BbTabsContent>
+</BbTabs>
+
+<BbDialog @bind-Open="isEditOpen">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit: @editName</BbDialogTitle>
+            <BbDialogDescription>Modify send connector settings</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="form-group">
+            <BbLabel>Name</BbLabel>
+            <BbInput @bind-Value="editName" />
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group" style="flex:2">
+                <BbLabel>Smart Host</BbLabel>
+                <BbInput @bind-Value="editSmartHost" Placeholder="Direct MX if empty" />
+            </div>
+            <div class="form-group" style="flex:1">
+                <BbLabel>Port</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="editPort" />
+            </div>
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group" style="flex:1">
+                <BbLabel>Username</BbLabel>
+                <BbInput @bind-Value="editUsername" />
+            </div>
+            <div class="form-group" style="flex:1">
+                <BbLabel>Password</BbLabel>
+                <BbInput Type="InputType.Password" @bind-Value="editPassword" />
+            </div>
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group">
+                <BbLabel>Opportunistic TLS</BbLabel>
+                <BbNativeSelect @bind-Value="editOpportunisticTls">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </BbNativeSelect>
+            </div>
+            <div class="form-group">
+                <BbLabel>Require TLS</BbLabel>
+                <BbNativeSelect @bind-Value="editRequireTls">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                </BbNativeSelect>
+            </div>
+            <div class="form-group">
+                <BbLabel>Default</BbLabel>
+                <BbNativeSelect @bind-Value="editIsDefault">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                </BbNativeSelect>
+            </div>
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group" style="flex:1">
+                <BbLabel>Concurrent Deliveries</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="editConcurrency" />
+            </div>
+            <div class="form-group" style="flex:1">
+                <BbLabel>Max Retry Hours</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="editMaxRetry" />
+            </div>
+        </div>
+        <div class="form-group">
+            <BbLabel>Retry Intervals (minutes, comma-separated)</BbLabel>
+            <BbInput @bind-Value="editRetryIntervals" Placeholder="1,5,30,120,480,1440" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Enabled</BbLabel>
+            <BbNativeSelect @bind-Value="editEnabled">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </BbNativeSelect>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbDialogClose>
+            <BbButton Variant="ButtonVariant.Default" @onclick="SaveEditAsync">Save</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbAlertDialog @bind-Open="showDeleteConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Send Connector</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will remove this send connector and all associated domain routes.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbAlertDialog @bind-Open="showDeleteRouteConfirm">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Domain Route</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will remove this domain route. Mail for this domain will use the default connector.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteRouteAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Send Connectors</BbDialogTitle>
+            <BbDialogDescription>Outbound delivery configuration</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>Send connectors define how outbound email is delivered.</p>
+            <h4 style="margin-top:1rem;">Direct MX vs Smart Host</h4>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Direct MX</strong> &mdash; WinSmtpRelay looks up the recipient's MX record and delivers directly. Leave Smart Host empty.</li>
+                <li><strong>Smart Host</strong> &mdash; All mail is forwarded to an upstream relay (e.g. SendGrid, Microsoft 365, your ISP).</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Domain Routes</h4>
+            <p>Domain routes override the default connector for specific recipient domains. Routes are evaluated in sort order; the first match wins. Use <code>*.example.com</code> for wildcard matching.</p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private IReadOnlyList<SendConnector> connectors = [];
+    private IReadOnlyList<DomainRoute> routes = [];
+    private bool isLoading = true;
+    private bool showHelp;
+    private bool isEditOpen;
+    private bool showDeleteConfirm;
+    private bool showDeleteRouteConfirm;
+    private int deleteTargetId;
+    private int deleteRouteId;
+    private string? statusMessage;
+    private string activeTab = "connectors";
+
+    // Create connector form
+    private string newName = "";
+    private string newSmartHost = "";
+    private string newPort = "587";
+
+    // Create route form
+    private string newRouteDomain = "";
+    private string newRouteConnectorId = "";
+
+    // Edit connector form
+    private int editId;
+    private string editName = "";
+    private string editSmartHost = "";
+    private string editPort = "587";
+    private string editUsername = "";
+    private string editPassword = "";
+    private string editOpportunisticTls = "true";
+    private string editRequireTls = "false";
+    private string editIsDefault = "false";
+    private string editConcurrency = "4";
+    private string editMaxRetry = "48";
+    private string editRetryIntervals = "1,5,30,120,480,1440";
+    private string editEnabled = "true";
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true;
+        using var scope = ScopeFactory.CreateScope();
+        var connSvc = scope.ServiceProvider.GetRequiredService<ISendConnectorService>();
+        var routeSvc = scope.ServiceProvider.GetRequiredService<IDomainRouteService>();
+        connectors = await connSvc.GetAllAsync();
+        routes = await routeSvc.GetAllAsync();
+        if (connectors.Count > 0 && string.IsNullOrEmpty(newRouteConnectorId))
+            newRouteConnectorId = connectors[0].Id.ToString();
+        isLoading = false;
+    }
+
+    private async Task CreateConnectorAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ISendConnectorService>();
+
+        await svc.CreateAsync(new SendConnector
+        {
+            Name = newName.Trim(),
+            SmartHost = string.IsNullOrWhiteSpace(newSmartHost) ? null : newSmartHost.Trim(),
+            SmartHostPort = int.TryParse(newPort, out var p) ? p : 587
+        });
+
+        statusMessage = $"Connector '{newName}' created";
+        newName = "";
+        newSmartHost = "";
+        newPort = "587";
+        await RefreshAsync();
+    }
+
+    private async Task CreateRouteAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDomainRouteService>();
+
+        var nextOrder = routes.Count > 0 ? routes.Max(r => r.SortOrder) + 1 : 1;
+        await svc.CreateAsync(new DomainRoute
+        {
+            DomainPattern = newRouteDomain.Trim(),
+            SendConnectorId = int.TryParse(newRouteConnectorId, out var id) ? id : 0,
+            SortOrder = nextOrder
+        });
+
+        statusMessage = "Route added";
+        newRouteDomain = "";
+        await RefreshAsync();
+    }
+
+    private void StartEditConnector(SendConnector c)
+    {
+        editId = c.Id;
+        editName = c.Name;
+        editSmartHost = c.SmartHost ?? "";
+        editPort = c.SmartHostPort.ToString();
+        editUsername = c.Username ?? "";
+        editPassword = c.EncryptedPassword ?? "";
+        editOpportunisticTls = c.OpportunisticTls.ToString().ToLowerInvariant();
+        editRequireTls = c.RequireTls.ToString().ToLowerInvariant();
+        editIsDefault = c.IsDefault.ToString().ToLowerInvariant();
+        editConcurrency = c.MaxConcurrentDeliveries.ToString();
+        editMaxRetry = c.MaxRetryHours.ToString();
+        editRetryIntervals = c.RetryIntervalsMinutes;
+        editEnabled = c.IsEnabled.ToString().ToLowerInvariant();
+        isEditOpen = true;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ISendConnectorService>();
+
+        await svc.UpdateAsync(new SendConnector
+        {
+            Id = editId,
+            Name = editName.Trim(),
+            SmartHost = string.IsNullOrWhiteSpace(editSmartHost) ? null : editSmartHost.Trim(),
+            SmartHostPort = int.TryParse(editPort, out var p) ? p : 587,
+            Username = string.IsNullOrWhiteSpace(editUsername) ? null : editUsername.Trim(),
+            EncryptedPassword = string.IsNullOrWhiteSpace(editPassword) ? null : editPassword,
+            OpportunisticTls = editOpportunisticTls == "true",
+            RequireTls = editRequireTls == "true",
+            IsDefault = editIsDefault == "true",
+            MaxConcurrentDeliveries = int.TryParse(editConcurrency, out var c) ? c : 4,
+            MaxRetryHours = int.TryParse(editMaxRetry, out var r) ? r : 48,
+            RetryIntervalsMinutes = editRetryIntervals.Trim(),
+            ConnectTimeoutSeconds = 30,
+            IsEnabled = editEnabled == "true"
+        });
+
+        statusMessage = "Connector updated";
+        isEditOpen = false;
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<ISendConnectorService>();
+        await svc.DeleteAsync(deleteTargetId);
+        statusMessage = "Connector deleted";
+        showDeleteConfirm = false;
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteRouteAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IDomainRouteService>();
+        await svc.DeleteAsync(deleteRouteId);
+        statusMessage = "Route deleted";
+        showDeleteRouteConfirm = false;
+        await RefreshAsync();
+    }
+}

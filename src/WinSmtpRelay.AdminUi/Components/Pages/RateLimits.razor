@@ -1,0 +1,139 @@
+@page "/rate-limits"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Rate Limits</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Rate Limits &amp; Auto-Ban</h1>
+        <p>Global rate limiting and failed authentication ban settings</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About Rate Limits
+    </BbButton>
+</div>
+
+@if (isLoading)
+{
+    <BbSkeleton Class="h-[300px] w-full" />
+}
+else
+{
+    <div style="max-width:500px;">
+    <BbCard>
+        <BbCardHeader>
+            <BbCardTitle>Rate Limit Settings</BbCardTitle>
+        </BbCardHeader>
+        <BbCardContent>
+            <div class="form-group">
+                <BbLabel>Max Connections per IP per Minute</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="maxConnPerIp" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Max Messages per Sender per Minute</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="maxMsgPerMin" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Max Messages per Sender per Day</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="maxMsgPerDay" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Failed Auth Ban Threshold (attempts)</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="banThreshold" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Failed Auth Ban Duration (minutes)</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="banMinutes" />
+            </div>
+        </BbCardContent>
+        <BbCardFooter>
+            <BbButton Variant="ButtonVariant.Default" @onclick="SaveAsync">
+                <LucideIcon Name="save" /> Save
+            </BbButton>
+            @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <span class="text-muted" style="margin-left:1rem">@statusMessage</span>
+            }
+        </BbCardFooter>
+    </BbCard>
+    </div>
+}
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Rate Limits</BbDialogTitle>
+            <BbDialogDescription>How rate limiting and auto-ban protect your relay</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <p>Rate limits prevent abuse by throttling connections and messages from any single source.</p>
+            <h4 style="margin-top:1rem;">Connection Limits</h4>
+            <p>Limits how many TCP connections a single IP address can open per minute.</p>
+            <h4 style="margin-top:1rem;">Message Limits</h4>
+            <p>Limits how many messages a single sender address can submit per minute and per day.</p>
+            <h4 style="margin-top:1rem;">Auto-Ban</h4>
+            <p>After the configured number of failed authentication attempts, the source IP is temporarily banned for the configured duration.</p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private bool isLoading = true;
+    private bool showHelp;
+    private string? statusMessage;
+
+    private string maxConnPerIp = "30";
+    private string maxMsgPerMin = "20";
+    private string maxMsgPerDay = "1000";
+    private string banThreshold = "5";
+    private string banMinutes = "30";
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IRateLimitSettingsService>();
+        var s = await svc.GetAsync();
+
+        maxConnPerIp = s.MaxConnectionsPerIpPerMinute.ToString();
+        maxMsgPerMin = s.MaxMessagesPerSenderPerMinute.ToString();
+        maxMsgPerDay = s.MaxMessagesPerSenderPerDay.ToString();
+        banThreshold = s.FailedAuthBanThreshold.ToString();
+        banMinutes = s.FailedAuthBanMinutes.ToString();
+        isLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IRateLimitSettingsService>();
+
+        await svc.UpdateAsync(new RateLimitSettings
+        {
+            Id = 1,
+            MaxConnectionsPerIpPerMinute = int.TryParse(maxConnPerIp, out var v1) ? v1 : 30,
+            MaxMessagesPerSenderPerMinute = int.TryParse(maxMsgPerMin, out var v2) ? v2 : 20,
+            MaxMessagesPerSenderPerDay = int.TryParse(maxMsgPerDay, out var v3) ? v3 : 1000,
+            FailedAuthBanThreshold = int.TryParse(banThreshold, out var v4) ? v4 : 5,
+            FailedAuthBanMinutes = int.TryParse(banMinutes, out var v5) ? v5 : 30
+        });
+
+        statusMessage = "Settings saved";
+    }
+}

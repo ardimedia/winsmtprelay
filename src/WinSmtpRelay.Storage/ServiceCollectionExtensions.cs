@@ -15,6 +15,16 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IStatisticsService, StatisticsService>();
 
+        // Configuration services
+        services.AddScoped<IReceiveConnectorService, ReceiveConnectorService>();
+        services.AddScoped<IAcceptedDomainService, AcceptedDomainService>();
+        services.AddScoped<IIpAccessRuleService, IpAccessRuleService>();
+        services.AddScoped<ISendConnectorService, SendConnectorService>();
+        services.AddScoped<IDomainRouteService, DomainRouteService>();
+        services.AddScoped<IDkimDomainService, DkimDomainService>();
+        services.AddScoped<IRateLimitSettingsService, RateLimitSettingsService>();
+        services.AddScoped<IMessageFilterService, MessageFilterService>();
+
         return services;
     }
 }

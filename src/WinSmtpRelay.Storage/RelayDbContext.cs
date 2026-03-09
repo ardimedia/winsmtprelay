@@ -10,6 +10,17 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
     public DbSet<RelayUser> RelayUsers => Set<RelayUser>();
     public DbSet<DailyStatistics> DailyStatistics => Set<DailyStatistics>();
 
+    // Configuration entities (runtime-editable via Admin UI)
+    public DbSet<ReceiveConnector> ReceiveConnectors => Set<ReceiveConnector>();
+    public DbSet<AcceptedDomain> AcceptedDomains => Set<AcceptedDomain>();
+    public DbSet<IpAccessRule> IpAccessRules => Set<IpAccessRule>();
+    public DbSet<SendConnector> SendConnectors => Set<SendConnector>();
+    public DbSet<DomainRoute> DomainRoutes => Set<DomainRoute>();
+    public DbSet<DkimDomain> DkimDomains => Set<DkimDomain>();
+    public DbSet<RateLimitSettings> RateLimitSettings => Set<RateLimitSettings>();
+    public DbSet<HeaderRewriteEntry> HeaderRewriteEntries => Set<HeaderRewriteEntry>();
+    public DbSet<SenderRewriteEntry> SenderRewriteEntries => Set<SenderRewriteEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<QueuedMessage>(entity =>
@@ -44,6 +55,85 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
         modelBuilder.Entity<DailyStatistics>(entity =>
         {
             entity.HasKey(e => e.Date);
+        });
+
+        // Configuration entities
+
+        modelBuilder.Entity<ReceiveConnector>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.Address).HasMaxLength(45);
+        });
+
+        modelBuilder.Entity<AcceptedDomain>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Domain).IsUnique();
+            entity.Property(e => e.Domain).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<IpAccessRule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SortOrder);
+            entity.Property(e => e.Network).HasMaxLength(50);
+            entity.Property(e => e.Description).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<SendConnector>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.SmartHost).HasMaxLength(255);
+            entity.Property(e => e.Username).HasMaxLength(255);
+            entity.Property(e => e.RetryIntervalsMinutes).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<DomainRoute>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SortOrder);
+            entity.Property(e => e.DomainPattern).HasMaxLength(255);
+            entity.HasOne(e => e.SendConnector)
+                .WithMany(s => s.DomainRoutes)
+                .HasForeignKey(e => e.SendConnectorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DkimDomain>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Domain).IsUnique();
+            entity.Property(e => e.Domain).HasMaxLength(255);
+            entity.Property(e => e.Selector).HasMaxLength(100);
+            entity.Property(e => e.PrivateKeyPath).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<RateLimitSettings>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasData(new RateLimitSettings
+            {
+                Id = 1,
+                UpdatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+        });
+
+        modelBuilder.Entity<HeaderRewriteEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SortOrder);
+            entity.Property(e => e.HeaderName).HasMaxLength(255);
+            entity.Property(e => e.Action).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<SenderRewriteEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.SortOrder);
+            entity.Property(e => e.FromPattern).HasMaxLength(320);
+            entity.Property(e => e.ToAddress).HasMaxLength(320);
         });
     }
 }

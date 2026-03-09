@@ -1,0 +1,526 @@
+@page "/filters"
+@using WinSmtpRelay.Core.Interfaces
+@using WinSmtpRelay.Core.Models
+@inject IServiceScopeFactory ScopeFactory
+
+<BbBreadcrumb>
+    <BbBreadcrumbList>
+        <BbBreadcrumbItem>
+            <BbBreadcrumbLink Href="/">Home</BbBreadcrumbLink>
+        </BbBreadcrumbItem>
+        <BbBreadcrumbSeparator />
+        <BbBreadcrumbItem>
+            <BbBreadcrumbPage>Message Filters</BbBreadcrumbPage>
+        </BbBreadcrumbItem>
+    </BbBreadcrumbList>
+</BbBreadcrumb>
+
+<div class="page-header page-header-row">
+    <div>
+        <h1>Message Filters</h1>
+        <p>Header rewrite and sender rewrite rules applied to outgoing messages</p>
+    </div>
+    <BbButton Variant="ButtonVariant.Outline" Size="ButtonSize.Small" @onclick="() => showHelp = true">
+        <LucideIcon Name="info" /> About Filters
+    </BbButton>
+</div>
+
+<BbTabs DefaultValue="headers" @bind-Value="activeTab">
+    <BbTabsList>
+        <BbTabsTrigger Value="headers">Header Rewrites</BbTabsTrigger>
+        <BbTabsTrigger Value="senders">Sender Rewrites</BbTabsTrigger>
+    </BbTabsList>
+
+    <BbTabsContent Value="headers">
+        <div style="max-width:500px;">
+        <BbCard Class="mb-1">
+            <BbCardHeader>
+                <BbCardTitle>Add Header Rule</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="form-group">
+                    <BbLabel>Header Name</BbLabel>
+                    <BbInput @bind-Value="newHeaderName" Placeholder="X-Custom-Header" />
+                </div>
+                <div class="form-group">
+                    <BbLabel>Action</BbLabel>
+                    <BbNativeSelect @bind-Value="newHeaderAction">
+                        <option value="Set">Set</option>
+                        <option value="Remove">Remove</option>
+                        <option value="Append">Append</option>
+                    </BbNativeSelect>
+                </div>
+                <div class="form-group">
+                    <BbLabel>Match Value (optional, regex)</BbLabel>
+                    <BbInput @bind-Value="newHeaderMatch" Placeholder=".*" />
+                </div>
+                <div class="form-group">
+                    <BbLabel>New Value</BbLabel>
+                    <BbInput @bind-Value="newHeaderValue" Placeholder="new value" />
+                </div>
+            </BbCardContent>
+            <BbCardFooter>
+                <BbButton Variant="ButtonVariant.Default" @onclick="CreateHeaderRuleAsync"
+                        Disabled="@string.IsNullOrWhiteSpace(newHeaderName)">
+                    <LucideIcon Name="plus" /> Add
+                </BbButton>
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <span class="text-muted" style="margin-left:1rem">@statusMessage</span>
+                }
+            </BbCardFooter>
+        </BbCard>
+        </div>
+
+        <BbTable Data="@headerRules">
+            <BbTableHeader>
+                <BbTableRow TData="HeaderRewriteEntry">
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Order</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Header</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Action</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Match</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">New Value</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Enabled</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="HeaderRewriteEntry">Actions</BbTableHeaderCell>
+                </BbTableRow>
+            </BbTableHeader>
+            <BbTableBody>
+                @if (headerRules.Count == 0)
+                {
+                    <BbTableRow TData="HeaderRewriteEntry">
+                        <BbTableCell colspan="7" style="text-align:center;">No header rewrite rules</BbTableCell>
+                    </BbTableRow>
+                }
+                @foreach (var r in headerRules)
+                {
+                    <BbTableRow Item="@r">
+                        <BbTableCell>@r.SortOrder</BbTableCell>
+                        <BbTableCell><code>@r.HeaderName</code></BbTableCell>
+                        <BbTableCell>@r.Action</BbTableCell>
+                        <BbTableCell>@(r.MatchValue ?? "\u2014")</BbTableCell>
+                        <BbTableCell>@(r.NewValue ?? "\u2014")</BbTableCell>
+                        <BbTableCell><span class="badge-status @(r.IsEnabled ? "badge-success" : "badge-muted")">@(r.IsEnabled ? "Yes" : "No")</span></BbTableCell>
+                        <BbTableCell>
+                            <BbDropdownMenu>
+                                <BbDropdownMenuTrigger>
+                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost">
+                                        <LucideIcon Name="ellipsis" />
+                                    </BbButton>
+                                </BbDropdownMenuTrigger>
+                                <BbDropdownMenuContent>
+                                    <BbDropdownMenuItem @onclick="() => StartEditHeader(r)">
+                                        <LucideIcon Name="pencil" /> Edit
+                                    </BbDropdownMenuItem>
+                                    <BbDropdownMenuSeparator />
+                                    <BbDropdownMenuItem @onclick="() => { deleteHeaderId = r.Id; showDeleteHeader = true; }">
+                                        <LucideIcon Name="trash-2" /> Delete
+                                    </BbDropdownMenuItem>
+                                </BbDropdownMenuContent>
+                            </BbDropdownMenu>
+                        </BbTableCell>
+                    </BbTableRow>
+                }
+            </BbTableBody>
+        </BbTable>
+    </BbTabsContent>
+
+    <BbTabsContent Value="senders">
+        <div style="max-width:500px;">
+        <BbCard Class="mb-1">
+            <BbCardHeader>
+                <BbCardTitle>Add Sender Rewrite</BbCardTitle>
+            </BbCardHeader>
+            <BbCardContent>
+                <div class="form-group">
+                    <BbLabel>From Pattern (regex)</BbLabel>
+                    <BbInput @bind-Value="newSenderFrom" Placeholder="user@example.com" />
+                </div>
+                <div class="form-group">
+                    <BbLabel>Rewrite To</BbLabel>
+                    <BbInput @bind-Value="newSenderTo" Placeholder="noreply@newdomain.com" />
+                </div>
+            </BbCardContent>
+            <BbCardFooter>
+                <BbButton Variant="ButtonVariant.Default" @onclick="CreateSenderRuleAsync"
+                        Disabled="@(string.IsNullOrWhiteSpace(newSenderFrom) || string.IsNullOrWhiteSpace(newSenderTo))">
+                    <LucideIcon Name="plus" /> Add
+                </BbButton>
+            </BbCardFooter>
+        </BbCard>
+        </div>
+
+        <BbTable Data="@senderRules">
+            <BbTableHeader>
+                <BbTableRow TData="SenderRewriteEntry">
+                    <BbTableHeaderCell TData="SenderRewriteEntry">Order</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="SenderRewriteEntry">From Pattern</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="SenderRewriteEntry">To Address</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="SenderRewriteEntry">Enabled</BbTableHeaderCell>
+                    <BbTableHeaderCell TData="SenderRewriteEntry">Actions</BbTableHeaderCell>
+                </BbTableRow>
+            </BbTableHeader>
+            <BbTableBody>
+                @if (senderRules.Count == 0)
+                {
+                    <BbTableRow TData="SenderRewriteEntry">
+                        <BbTableCell colspan="5" style="text-align:center;">No sender rewrite rules</BbTableCell>
+                    </BbTableRow>
+                }
+                @foreach (var r in senderRules)
+                {
+                    <BbTableRow Item="@r">
+                        <BbTableCell>@r.SortOrder</BbTableCell>
+                        <BbTableCell><code>@r.FromPattern</code></BbTableCell>
+                        <BbTableCell>@r.ToAddress</BbTableCell>
+                        <BbTableCell><span class="badge-status @(r.IsEnabled ? "badge-success" : "badge-muted")">@(r.IsEnabled ? "Yes" : "No")</span></BbTableCell>
+                        <BbTableCell>
+                            <BbDropdownMenu>
+                                <BbDropdownMenuTrigger>
+                                    <BbButton Size="ButtonSize.Small" Variant="ButtonVariant.Ghost">
+                                        <LucideIcon Name="ellipsis" />
+                                    </BbButton>
+                                </BbDropdownMenuTrigger>
+                                <BbDropdownMenuContent>
+                                    <BbDropdownMenuItem @onclick="() => StartEditSender(r)">
+                                        <LucideIcon Name="pencil" /> Edit
+                                    </BbDropdownMenuItem>
+                                    <BbDropdownMenuSeparator />
+                                    <BbDropdownMenuItem @onclick="() => { deleteSenderId = r.Id; showDeleteSender = true; }">
+                                        <LucideIcon Name="trash-2" /> Delete
+                                    </BbDropdownMenuItem>
+                                </BbDropdownMenuContent>
+                            </BbDropdownMenu>
+                        </BbTableCell>
+                    </BbTableRow>
+                }
+            </BbTableBody>
+        </BbTable>
+    </BbTabsContent>
+</BbTabs>
+
+<BbDialog @bind-Open="isEditHeaderOpen">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit Header Rule</BbDialogTitle>
+            <BbDialogDescription>Modify the header rewrite rule</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="form-group">
+            <BbLabel>Header Name</BbLabel>
+            <BbInput @bind-Value="editHeaderName" />
+        </div>
+        <div class="form-group">
+            <BbLabel>Action</BbLabel>
+            <BbNativeSelect @bind-Value="editHeaderAction">
+                <option value="Set">Set</option>
+                <option value="Remove">Remove</option>
+                <option value="Append">Append</option>
+            </BbNativeSelect>
+        </div>
+        <div class="form-group">
+            <BbLabel>Match Value</BbLabel>
+            <BbInput @bind-Value="editHeaderMatch" />
+        </div>
+        <div class="form-group">
+            <BbLabel>New Value</BbLabel>
+            <BbInput @bind-Value="editHeaderValue" />
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group">
+                <BbLabel>Sort Order</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="editHeaderOrder" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Enabled</BbLabel>
+                <BbNativeSelect @bind-Value="editHeaderEnabled">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </BbNativeSelect>
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbDialogClose>
+            <BbButton Variant="ButtonVariant.Default" @onclick="SaveEditHeaderAsync">Save</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbDialog @bind-Open="isEditSenderOpen">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>Edit Sender Rewrite</BbDialogTitle>
+            <BbDialogDescription>Modify the sender rewrite rule</BbDialogDescription>
+        </BbDialogHeader>
+        <div class="form-group">
+            <BbLabel>From Pattern</BbLabel>
+            <BbInput @bind-Value="editSenderFrom" />
+        </div>
+        <div class="form-group">
+            <BbLabel>To Address</BbLabel>
+            <BbInput @bind-Value="editSenderTo" />
+        </div>
+        <div style="display:flex;gap:1rem;">
+            <div class="form-group">
+                <BbLabel>Sort Order</BbLabel>
+                <BbInput Type="InputType.Number" @bind-Value="editSenderOrder" />
+            </div>
+            <div class="form-group">
+                <BbLabel>Enabled</BbLabel>
+                <BbNativeSelect @bind-Value="editSenderEnabled">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </BbNativeSelect>
+            </div>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbDialogClose>
+            <BbButton Variant="ButtonVariant.Default" @onclick="SaveEditSenderAsync">Save</BbButton>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+<BbAlertDialog @bind-Open="showDeleteHeader">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Header Rule</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will permanently remove this header rewrite rule.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteHeaderAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbAlertDialog @bind-Open="showDeleteSender">
+    <BbAlertDialogContent>
+        <BbAlertDialogHeader>
+            <BbAlertDialogTitle>Delete Sender Rule</BbAlertDialogTitle>
+            <BbAlertDialogDescription>This will permanently remove this sender rewrite rule.</BbAlertDialogDescription>
+        </BbAlertDialogHeader>
+        <BbAlertDialogFooter>
+            <BbAlertDialogCancel>
+                <BbButton Variant="ButtonVariant.Outline">Cancel</BbButton>
+            </BbAlertDialogCancel>
+            <BbAlertDialogAction>
+                <BbButton Variant="ButtonVariant.Destructive" @onclick="ConfirmDeleteSenderAsync">Delete</BbButton>
+            </BbAlertDialogAction>
+        </BbAlertDialogFooter>
+    </BbAlertDialogContent>
+</BbAlertDialog>
+
+<BbDialog @bind-Open="showHelp">
+    <BbDialogContent>
+        <BbDialogHeader>
+            <BbDialogTitle>About Message Filters</BbDialogTitle>
+            <BbDialogDescription>Rules applied to messages during delivery</BbDialogDescription>
+        </BbDialogHeader>
+        <div style="font-size:0.875rem;line-height:1.6;">
+            <h4>Header Rewrites</h4>
+            <p>Modify, add, or remove email headers before delivery. Useful for adding tracking headers, removing internal headers, or standardizing header values.</p>
+            <ul style="padding-left:1.25rem;">
+                <li><strong>Set</strong> &mdash; Set or replace a header value</li>
+                <li><strong>Remove</strong> &mdash; Remove headers matching the name and optional pattern</li>
+                <li><strong>Append</strong> &mdash; Add a value to existing headers</li>
+            </ul>
+            <h4 style="margin-top:1rem;">Sender Rewrites</h4>
+            <p>Rewrite the envelope sender (MAIL FROM) address. The <em>From Pattern</em> is a regex matched against the sender address. If it matches, the sender is replaced with the <em>To Address</em>.</p>
+        </div>
+        <BbDialogFooter>
+            <BbDialogClose>
+                <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
+            </BbDialogClose>
+        </BbDialogFooter>
+    </BbDialogContent>
+</BbDialog>
+
+@code {
+    private IReadOnlyList<HeaderRewriteEntry> headerRules = [];
+    private IReadOnlyList<SenderRewriteEntry> senderRules = [];
+    private bool isLoading = true;
+    private bool showHelp;
+    private string? statusMessage;
+    private string activeTab = "headers";
+
+    // Header delete
+    private bool showDeleteHeader;
+    private int deleteHeaderId;
+
+    // Sender delete
+    private bool showDeleteSender;
+    private int deleteSenderId;
+
+    // Create header form
+    private string newHeaderName = "";
+    private string newHeaderAction = "Set";
+    private string newHeaderMatch = "";
+    private string newHeaderValue = "";
+
+    // Create sender form
+    private string newSenderFrom = "";
+    private string newSenderTo = "";
+
+    // Edit header form
+    private bool isEditHeaderOpen;
+    private int editHeaderId;
+    private string editHeaderName = "";
+    private string editHeaderAction = "Set";
+    private string editHeaderMatch = "";
+    private string editHeaderValue = "";
+    private string editHeaderOrder = "0";
+    private string editHeaderEnabled = "true";
+
+    // Edit sender form
+    private bool isEditSenderOpen;
+    private int editSenderId;
+    private string editSenderFrom = "";
+    private string editSenderTo = "";
+    private string editSenderOrder = "0";
+    private string editSenderEnabled = "true";
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true;
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+        headerRules = await svc.GetHeaderRulesAsync();
+        senderRules = await svc.GetSenderRulesAsync();
+        isLoading = false;
+    }
+
+    // Header CRUD
+
+    private async Task CreateHeaderRuleAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+
+        var nextOrder = headerRules.Count > 0 ? headerRules.Max(r => r.SortOrder) + 1 : 1;
+        await svc.CreateHeaderRuleAsync(new HeaderRewriteEntry
+        {
+            HeaderName = newHeaderName.Trim(),
+            Action = newHeaderAction,
+            MatchValue = string.IsNullOrWhiteSpace(newHeaderMatch) ? null : newHeaderMatch.Trim(),
+            NewValue = string.IsNullOrWhiteSpace(newHeaderValue) ? null : newHeaderValue.Trim(),
+            SortOrder = nextOrder
+        });
+
+        statusMessage = "Header rule added";
+        newHeaderName = "";
+        newHeaderMatch = "";
+        newHeaderValue = "";
+        await RefreshAsync();
+    }
+
+    private void StartEditHeader(HeaderRewriteEntry r)
+    {
+        editHeaderId = r.Id;
+        editHeaderName = r.HeaderName;
+        editHeaderAction = r.Action;
+        editHeaderMatch = r.MatchValue ?? "";
+        editHeaderValue = r.NewValue ?? "";
+        editHeaderOrder = r.SortOrder.ToString();
+        editHeaderEnabled = r.IsEnabled.ToString().ToLowerInvariant();
+        isEditHeaderOpen = true;
+    }
+
+    private async Task SaveEditHeaderAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+
+        await svc.UpdateHeaderRuleAsync(new HeaderRewriteEntry
+        {
+            Id = editHeaderId,
+            HeaderName = editHeaderName.Trim(),
+            Action = editHeaderAction,
+            MatchValue = string.IsNullOrWhiteSpace(editHeaderMatch) ? null : editHeaderMatch.Trim(),
+            NewValue = string.IsNullOrWhiteSpace(editHeaderValue) ? null : editHeaderValue.Trim(),
+            SortOrder = int.TryParse(editHeaderOrder, out var s) ? s : 0,
+            IsEnabled = editHeaderEnabled == "true"
+        });
+
+        statusMessage = "Header rule updated";
+        isEditHeaderOpen = false;
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteHeaderAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+        await svc.DeleteHeaderRuleAsync(deleteHeaderId);
+        statusMessage = "Header rule deleted";
+        showDeleteHeader = false;
+        await RefreshAsync();
+    }
+
+    // Sender CRUD
+
+    private async Task CreateSenderRuleAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+
+        var nextOrder = senderRules.Count > 0 ? senderRules.Max(r => r.SortOrder) + 1 : 1;
+        await svc.CreateSenderRuleAsync(new SenderRewriteEntry
+        {
+            FromPattern = newSenderFrom.Trim(),
+            ToAddress = newSenderTo.Trim(),
+            SortOrder = nextOrder
+        });
+
+        statusMessage = "Sender rule added";
+        newSenderFrom = "";
+        newSenderTo = "";
+        await RefreshAsync();
+    }
+
+    private void StartEditSender(SenderRewriteEntry r)
+    {
+        editSenderId = r.Id;
+        editSenderFrom = r.FromPattern;
+        editSenderTo = r.ToAddress;
+        editSenderOrder = r.SortOrder.ToString();
+        editSenderEnabled = r.IsEnabled.ToString().ToLowerInvariant();
+        isEditSenderOpen = true;
+    }
+
+    private async Task SaveEditSenderAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+
+        await svc.UpdateSenderRuleAsync(new SenderRewriteEntry
+        {
+            Id = editSenderId,
+            FromPattern = editSenderFrom.Trim(),
+            ToAddress = editSenderTo.Trim(),
+            SortOrder = int.TryParse(editSenderOrder, out var s) ? s : 0,
+            IsEnabled = editSenderEnabled == "true"
+        });
+
+        statusMessage = "Sender rule updated";
+        isEditSenderOpen = false;
+        await RefreshAsync();
+    }
+
+    private async Task ConfirmDeleteSenderAsync()
+    {
+        using var scope = ScopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IMessageFilterService>();
+        await svc.DeleteSenderRuleAsync(deleteSenderId);
+        statusMessage = "Sender rule deleted";
+        showDeleteSender = false;
+        await RefreshAsync();
+    }
+}

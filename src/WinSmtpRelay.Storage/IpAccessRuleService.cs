@@ -1,0 +1,38 @@
+using Microsoft.EntityFrameworkCore;
+using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
+
+namespace WinSmtpRelay.Storage;
+
+public class IpAccessRuleService(RelayDbContext db) : IIpAccessRuleService
+{
+    public async Task<IReadOnlyList<IpAccessRule>> GetAllAsync(CancellationToken ct = default)
+    {
+        return await db.IpAccessRules.AsNoTracking().OrderBy(r => r.SortOrder).ToListAsync(ct);
+    }
+
+    public async Task<IpAccessRule> CreateAsync(IpAccessRule rule, CancellationToken ct = default)
+    {
+        db.IpAccessRules.Add(rule);
+        await db.SaveChangesAsync(ct);
+        return rule;
+    }
+
+    public async Task UpdateAsync(IpAccessRule rule, CancellationToken ct = default)
+    {
+        var existing = await db.IpAccessRules.FindAsync([rule.Id], ct);
+        if (existing is null) return;
+
+        existing.Network = rule.Network;
+        existing.Action = rule.Action;
+        existing.SortOrder = rule.SortOrder;
+        existing.Description = rule.Description;
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeleteAsync(int id, CancellationToken ct = default)
+    {
+        await db.IpAccessRules.Where(r => r.Id == id).ExecuteDeleteAsync(ct);
+    }
+}
