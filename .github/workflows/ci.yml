@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            # Tag build: v1.0.0-beta1 → VERSION=1.0.0, VERSION_SUFFIX=beta1, TAG_LABEL=1.0.0-beta1
+            # Tag build: v1.0.0-beta1-build20 → VERSION=1.0.0, VERSION_SUFFIX=beta1-build20, TAG_LABEL=1.0.0-beta1-build20
             TAG="${GITHUB_REF_NAME#v}"
             echo "VERSION=${TAG%%-*}" >> "$GITHUB_ENV"
             if [[ "$TAG" == *-* ]]; then

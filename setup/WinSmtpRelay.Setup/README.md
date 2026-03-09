@@ -20,30 +20,30 @@ D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 fetch latest updates from github
 update all release references (readme.md, etc) to the new version, check also this:
     <Version>1.0.0</Version>
-    <VersionSuffix>beta20</VersionSuffix>
-    git commit -m "bump version to 1.0.0-beta20"
-    git tag v1.0.0-beta20
+    <VersionSuffix>beta1-build20</VersionSuffix>
+    git commit -m "bump version to 1.0.0-beta1-build20"
+    git tag v1.0.0-beta1-build20
 
 make sure copyright has the current year: Copyright (c) 2026 ARDIMEDIA
 make sure the version below is higher than the current one, otherwise aboard with a message
-bump to 1.0.0-beta20 and push
+bump to 1.0.0-beta1-build20 and push
 ```
 
 **1. Bump the version** in `Directory.Build.props`:
 
 ```xml
 <!-- Examples: -->
-<Version>1.0.0</Version>  <VersionSuffix>beta2</VersionSuffix>   <!-- pre-release -->
-<Version>1.0.0</Version>  <VersionSuffix></VersionSuffix>         <!-- stable release -->
-<Version>1.1.0</Version>  <VersionSuffix>beta1</VersionSuffix>   <!-- next minor -->
+<Version>1.0.0</Version>  <VersionSuffix>beta1-build21</VersionSuffix>   <!-- pre-release, next build -->
+<Version>1.0.0</Version>  <VersionSuffix></VersionSuffix>                 <!-- stable release -->
+<Version>1.1.0</Version>  <VersionSuffix>beta1-build1</VersionSuffix>    <!-- next minor -->
 ```
 
 **2. Commit and tag:**
 
 ```bash
 git add Directory.Build.props
-git commit -m "bump version to 1.0.0-beta2"
-git tag v1.0.0-beta2
+git commit -m "bump version to 1.0.0-beta1-build21"
+git tag v1.0.0-beta1-build21
 git push origin main --tags
 ```
 
@@ -59,20 +59,21 @@ git push origin main --tags
 
 | Step | `Version` | `VersionSuffix` | Tag | GitHub Release |
 |------|-----------|-----------------|-----|---------------|
-| First beta | `1.0.0` | `beta1` | `v1.0.0-beta1` | Pre-release |
-| Second beta | `1.0.0` | `beta2` | `v1.0.0-beta2` | Pre-release |
+| Beta 1 build 1 | `1.0.0` | `beta1-build1` | `v1.0.0-beta1-build1` | Pre-release |
+| Beta 1 build 20 | `1.0.0` | `beta1-build20` | `v1.0.0-beta1-build20` | Pre-release |
+| Beta 2 build 1 | `1.0.0` | `beta2-build1` | `v1.0.0-beta2-build1` | Pre-release |
 | Release candidate | `1.0.0` | `rc1` | `v1.0.0-rc1` | Pre-release |
 | Stable | `1.0.0` | *(empty)* | `v1.0.0` | Stable |
-| Next minor | `1.1.0` | `beta1` | `v1.1.0-beta1` | Pre-release |
+| Next minor | `1.1.0` | `beta1-build1` | `v1.1.0-beta1-build1` | Pre-release |
 
 ### How it works internally
 
 | Property | Example | Where it appears |
 |----------|---------|-----------------|
 | `Version` | `1.0.0` | MSI version, `AssemblyVersion`, `FileVersion` |
-| `VersionSuffix` | `beta1` | Pre-release label |
-| `InformationalVersion` | `1.0.0-beta1` | Admin UI `/api/server/info`, Windows file details |
-| MSI product name | `WinSmtpRelay 1.0.0 Beta 1` | Add/Remove Programs |
+| `VersionSuffix` | `beta1-build20` | Pre-release label |
+| `InformationalVersion` | `1.0.0-beta1-build20` | Admin UI `/api/server/info`, Windows file details |
+| MSI product name | `WinSmtpRelay 1.0.0 Beta 1 Build 20` | Add/Remove Programs |
 
 MSI only supports 3-part numeric versions. The pre-release label goes in the product display name (`Package.wxs`), not the MSI version field.
 
