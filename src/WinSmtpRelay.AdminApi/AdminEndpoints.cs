@@ -29,6 +29,7 @@ public static class AdminEndpoints
         // Configuration endpoints
         MapReceiveConnectorEndpoints(group);
         MapAcceptedDomainEndpoints(group);
+        MapAcceptedSenderDomainEndpoints(group);
         MapIpAccessRuleEndpoints(group);
         MapSendConnectorEndpoints(group);
         MapDomainRouteEndpoints(group);
@@ -297,6 +298,30 @@ public static class AdminEndpoints
         });
     }
 
+    private static void MapAcceptedSenderDomainEndpoints(RouteGroupBuilder group)
+    {
+        var ep = group.MapGroup("/domains/accepted-sender");
+
+        ep.MapGet("/", async (IAcceptedSenderDomainService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetAllAsync(ct)));
+
+        ep.MapPost("/", async (CreateAcceptedSenderDomainRequest req, IAcceptedSenderDomainService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
+        {
+            if (await svc.ExistsAsync(req.Domain, ct))
+                return Results.Conflict(new { Error = $"Domain '{req.Domain}' already exists" });
+            var created = await svc.CreateAsync(req.Domain, ct);
+            cache.Invalidate();
+            return Results.Created($"/api/domains/accepted-sender/{created.Id}", created);
+        });
+
+        ep.MapDelete("/{id:int}", async (int id, IAcceptedSenderDomainService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
+        {
+            await svc.DeleteAsync(id, ct);
+            cache.Invalidate();
+            return Results.Ok(new { Message = "Accepted sender domain deleted" });
+        });
+    }
+
     private static void MapIpAccessRuleEndpoints(RouteGroupBuilder group)
     {
         var ep = group.MapGroup("/ip-rules");
@@ -509,3 +534,4 @@ public record DeliveryLogSummary(
     string StatusMessage, string? RemoteServer, DateTime TimestampUtc);
 
 public record CreateAcceptedDomainRequest(string Domain);
+public record CreateAcceptedSenderDomainRequest(string Domain);

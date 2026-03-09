@@ -13,6 +13,7 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
     // Configuration entities (runtime-editable via Admin UI)
     public DbSet<ReceiveConnector> ReceiveConnectors => Set<ReceiveConnector>();
     public DbSet<AcceptedDomain> AcceptedDomains => Set<AcceptedDomain>();
+    public DbSet<AcceptedSenderDomain> AcceptedSenderDomains => Set<AcceptedSenderDomain>();
     public DbSet<IpAccessRule> IpAccessRules => Set<IpAccessRule>();
     public DbSet<SendConnector> SendConnectors => Set<SendConnector>();
     public DbSet<DomainRoute> DomainRoutes => Set<DomainRoute>();
@@ -67,6 +68,13 @@ public class RelayDbContext(DbContextOptions<RelayDbContext> options) : DbContex
         });
 
         modelBuilder.Entity<AcceptedDomain>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Domain).IsUnique();
+            entity.Property(e => e.Domain).HasMaxLength(255);
+        });
+
+        modelBuilder.Entity<AcceptedSenderDomain>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Domain).IsUnique();

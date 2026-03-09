@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         // Configuration services
         services.AddScoped<IReceiveConnectorService, ReceiveConnectorService>();
         services.AddScoped<IAcceptedDomainService, AcceptedDomainService>();
+        services.AddScoped<IAcceptedSenderDomainService, AcceptedSenderDomainService>();
         services.AddScoped<IIpAccessRuleService, IpAccessRuleService>();
         services.AddScoped<ISendConnectorService, SendConnectorService>();
         services.AddScoped<IDomainRouteService, DomainRouteService>();

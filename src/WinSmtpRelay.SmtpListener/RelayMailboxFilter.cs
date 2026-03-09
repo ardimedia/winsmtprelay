@@ -84,6 +84,22 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
             return false;
         }
 
+        // Check accepted sender domains (from DB cache)
+        var senderDomainForCheck = GetDomainFromAddress(from.AsAddress());
+        var acceptedSenderDomains = await _configCache.GetAcceptedSenderDomainsAsync(cancellationToken);
+        if (acceptedSenderDomains.Count > 0)
+        {
+            var senderDomainAccepted = acceptedSenderDomains.Any(d =>
+                string.Equals(d, senderDomainForCheck, StringComparison.OrdinalIgnoreCase));
+
+            if (!senderDomainAccepted)
+            {
+                _logger.LogWarning("Sender {Sender} rejected: domain {Domain} not in accepted sender domains",
+                    from.AsAddress(), senderDomainForCheck);
+                return false;
+            }
+        }
+
         // Per-user SendAs enforcement
         var authenticatedUser = GetAuthenticatedUser(context);
         if (authenticatedUser is not null)

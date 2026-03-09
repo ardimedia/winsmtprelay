@@ -9,6 +9,7 @@ namespace WinSmtpRelay.Core.Interfaces;
 public interface IRuntimeConfigCache
 {
     Task<IReadOnlyList<string>> GetAcceptedDomainsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<string>> GetAcceptedSenderDomainsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DomainRoute>> GetDomainRoutesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<HeaderRewriteEntry>> GetHeaderRewriteRulesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<SenderRewriteEntry>> GetSenderRewriteRulesAsync(CancellationToken ct = default);
