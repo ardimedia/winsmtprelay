@@ -31,7 +31,8 @@ public class SenderRewriteFilter : IMessageFilter
         if (matchingRule == null)
             return MessageFilterResult.Accepted();
 
-        _logger.LogDebug("Rewriting sender from {OldSender} to {NewSender}", context.Sender, matchingRule.ToAddress);
+        _logger.LogInformation("Rewriting sender from {OldSender} to {NewSender} (rule #{RuleId}, pattern: {Pattern})",
+            context.Sender, matchingRule.ToAddress, matchingRule.Id, matchingRule.FromPattern);
 
         var mimeMessage = await MimeMessage.LoadAsync(new MemoryStream(context.RawMessage), cancellationToken);
         mimeMessage.From.Clear();

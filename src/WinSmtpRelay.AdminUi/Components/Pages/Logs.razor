@@ -19,7 +19,8 @@
     <div>
         <h1>Event Log</h1>
         <p>
-            Windows Event Log entries for WinSmtpRelay@if (handledUntil.HasValue)
+            Windows Event Log entries for WinSmtpRelay
+            @if (handledUntil.HasValue)
             {
                 <text> &mdash; @unhandledCount new since last review</text>
             }
@@ -100,7 +101,18 @@
                 <BbTableCell style="white-space:nowrap;">@entry.Time.ToString("yyyy-MM-dd HH:mm:ss")</BbTableCell>
                 <BbTableCell><span class="badge-status @GetBadgeCss(entry.Level)">@entry.Level</span></BbTableCell>
                 <BbTableCell>@entry.Source</BbTableCell>
-                <BbTableCell>@Truncate(entry.Message, 120)</BbTableCell>
+                <BbTableCell>
+                    @{ var parsed = ParseMessageFields(entry.Message); }
+                    <table style="border-collapse:collapse;width:100%;table-layout:fixed;">
+                        @foreach (var field in parsed)
+                        {
+                            <tr>
+                                <td style="color:var(--muted-foreground);font-size:0.75rem;white-space:nowrap;padding:0 0.5rem 0 0;vertical-align:top;width:70px;">@field.Label:</td>
+                                <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0;">@field.Value</td>
+                            </tr>
+                        }
+                    </table>
+                </BbTableCell>
             </BbTableRow>
         }
     </BbTableBody>
@@ -116,7 +128,15 @@
                 </BbDialogTitle>
                 <BbDialogDescription>@selectedEntry.Time.ToString("yyyy-MM-dd HH:mm:ss") &mdash; @selectedEntry.Source</BbDialogDescription>
             </BbDialogHeader>
-            <div style="font-size:0.875rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow-y:auto;">@selectedEntry.Message</div>
+            <div style="font-size:0.875rem;line-height:1.6;max-height:60vh;overflow-y:auto;">
+                @foreach (var field in ParseMessageFields(selectedEntry.Message))
+                {
+                    <div style="margin-bottom:0.5rem;">
+                        <strong style="color:var(--muted-foreground);">@field.Label</strong><br />
+                        <span style="word-break:break-word;">@field.Value</span>
+                    </div>
+                }
+            </div>
             <BbDialogFooter>
                 <BbDialogClose>
                     <BbButton Variant="ButtonVariant.Outline">Close</BbButton>
@@ -174,7 +194,7 @@
     private bool showHelp;
     private List<LogEntry> logEntries = [];
     private string selectedLevel = "";
-    private string searchText = "";
+    private string searchText = "WinSmtpRelay";
     private string maxEntriesStr = "100";
     private int maxEntries => int.TryParse(maxEntriesStr, out var v) ? v : 100;
 
@@ -350,6 +370,77 @@
 
     private static string Truncate(string text, int maxLen) =>
         text.Length > maxLen ? text[..maxLen] + "..." : text;
+
+    /// <summary>
+    /// Extracts the core message from .NET Runtime formatted event log entries.
+    /// Input:  "Category: Some.Namespace.Class EventId: 0 Sender foo@bar.com rejected: domain bar.com not in accepted sender domains"
+    /// Output: "Sender foo@bar.com rejected: domain bar.com not in accepted sender domains"
+    /// </summary>
+    private static string ExtractCoreMessage(string message)
+    {
+        // .NET Runtime format: "Category: ... EventId: N actual message"
+        var eventIdMarker = "EventId: ";
+        var idx = message.IndexOf(eventIdMarker, StringComparison.Ordinal);
+        if (idx < 0)
+            return message;
+
+        // Skip past digits and whitespace after "EventId: "
+        var pos = idx + eventIdMarker.Length;
+        while (pos < message.Length && char.IsDigit(message[pos]))
+            pos++;
+        while (pos < message.Length && char.IsWhiteSpace(message[pos]))
+            pos++;
+
+        return pos < message.Length ? message[pos..] : message;
+    }
+
+    /// <summary>
+    /// Parses a .NET Runtime event log message into structured label/value fields.
+    /// </summary>
+    private static List<(string Label, string Value)> ParseMessageFields(string message)
+    {
+        var fields = new List<(string Label, string Value)>();
+
+        // Try to parse .NET Runtime format: "Category: X EventId: N message"
+        var eventIdMarker = "EventId: ";
+        var eventIdIdx = message.IndexOf(eventIdMarker, StringComparison.Ordinal);
+
+        if (eventIdIdx >= 0)
+        {
+            // Extract Category
+            var categoryPrefix = "Category: ";
+            var catIdx = message.IndexOf(categoryPrefix, StringComparison.Ordinal);
+            if (catIdx >= 0)
+            {
+                var catValue = message[(catIdx + categoryPrefix.Length)..eventIdIdx].Trim();
+                fields.Add(("Category", catValue));
+            }
+
+            // Extract EventId (digits only) and message (everything after)
+            var afterEventId = eventIdIdx + eventIdMarker.Length;
+            var numberEnd = afterEventId;
+            while (numberEnd < message.Length && char.IsDigit(message[numberEnd]))
+                numberEnd++;
+
+            var eventId = message[afterEventId..numberEnd];
+            fields.Add(("Event ID", eventId));
+
+            // Skip any whitespace between the number and the message text
+            var msgStart = numberEnd;
+            while (msgStart < message.Length && char.IsWhiteSpace(message[msgStart]))
+                msgStart++;
+
+            if (msgStart < message.Length)
+                fields.Add(("Message", message[msgStart..]));
+        }
+        else
+        {
+            // Not a .NET Runtime format — show as-is
+            fields.Add(("Message", message));
+        }
+
+        return fields;
+    }
 
     private record LogEntry(DateTime Time, string Level, string Source, string Message);
 }

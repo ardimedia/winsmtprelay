@@ -37,7 +37,7 @@ public class HeaderRewriteFilter : IMessageFilter
                     {
                         mimeMessage.Headers.RemoveAll(rule.HeaderName);
                         modified = true;
-                        _logger.LogDebug("Removed header {Header}", rule.HeaderName);
+                        _logger.LogInformation("Removed header {Header} (rule #{RuleId})", rule.HeaderName, rule.Id);
                     }
                     break;
 
@@ -48,7 +48,7 @@ public class HeaderRewriteFilter : IMessageFilter
                         {
                             mimeMessage.Headers[rule.HeaderName] = rule.NewValue;
                             modified = true;
-                            _logger.LogDebug("Set header {Header} = {Value}", rule.HeaderName, rule.NewValue);
+                            _logger.LogInformation("Set header {Header} = {Value} (rule #{RuleId})", rule.HeaderName, rule.NewValue, rule.Id);
                         }
                     }
                     break;
@@ -58,7 +58,7 @@ public class HeaderRewriteFilter : IMessageFilter
                     {
                         mimeMessage.Headers.Add(rule.HeaderName, rule.NewValue);
                         modified = true;
-                        _logger.LogDebug("Appended header {Header} = {Value}", rule.HeaderName, rule.NewValue);
+                        _logger.LogInformation("Appended header {Header} = {Value} (rule #{RuleId})", rule.HeaderName, rule.NewValue, rule.Id);
                     }
                     break;
             }
