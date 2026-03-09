@@ -17,7 +17,7 @@ Lets Claude do a release on github:
 
 ```
 fetch latest updates from github
-bump to 1.0.0-beta1-build24 (next version, no need to change)
+bump to 1.0.0-beta1-build25 (next version, no need to change)
 
 D:\CODE\github\ardimedia\winsmtprelay\setup\WinSmtpRelay.Setup\README.md
 update all release references (readme.md, etc) to the new version, check also this:
