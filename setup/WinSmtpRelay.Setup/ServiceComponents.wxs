@@ -26,6 +26,7 @@
       <ServiceControl Id="StopWinSmtpRelay"
                       Name="WinSmtpRelay"
                       Stop="both"
+                      Start="install"
                       Remove="uninstall"
                       Wait="yes" />
     </Component>
