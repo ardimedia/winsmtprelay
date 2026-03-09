@@ -20,6 +20,18 @@
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
 
+    <!-- Exit dialog: "Start service now?" checkbox (new installs only) -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Start WinSmtpRelay service now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+
+    <!-- WixUI ExitDlg triggers DoAction "LaunchApplication" when checkbox is checked -->
+    <CustomAction Id="LaunchApplication"
+                  Directory="SystemFolder"
+                  ExeCommand="sc.exe start WinSmtpRelay"
+                  Execute="immediate"
+                  Return="ignore"
+                  Impersonate="no" />
+
     <!-- .NET 10 runtime check for framework-dependent variant -->
     <?if $(var.SelfContained) = false ?>
     <Property Id="NETCORERUNTIME10">

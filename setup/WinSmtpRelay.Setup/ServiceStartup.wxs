@@ -1,0 +1,84 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Fragment>
+
+    <!--
+      Service startup logic for UPGRADES:
+      If the service was running before upgrade, restart it after install.
+      If it was stopped, leave it stopped.
+
+      Strategy: Use a temp file breadcrumb to pass state from the immediate CA
+      (before old product removal) to the deferred CA (after new product install).
+
+      New installs are handled by the exit dialog checkbox (LaunchApplication CA
+      in Package.wxs), not here.
+    -->
+
+    <!-- ================================================================
+         UPGRADE: Detect if the service was running BEFORE the old product
+         is removed (scheduled before InstallInitialize).
+         Writes a breadcrumb file if RUNNING is detected.
+         ================================================================ -->
+    <SetProperty Id="WixQuietExecCmdLine"
+                 Before="DetectServiceRunning"
+                 Sequence="execute"
+                 Value="&quot;[SystemFolder]cmd.exe&quot; /c &quot;sc query WinSmtpRelay | findstr /C:RUNNING &gt;nul 2&gt;&amp;1 &amp;&amp; echo 1&gt;&quot;[TempFolder]WinSmtpRelay_WasRunning.tmp&quot;&quot;"
+                 Condition="WIX_UPGRADE_DETECTED" />
+
+    <CustomAction Id="DetectServiceRunning"
+                  BinaryRef="Wix4UtilCA_X86"
+                  DllEntry="WixQuietExec"
+                  Execute="immediate"
+                  Return="ignore" />
+
+    <!-- ================================================================
+         UPGRADE: After install completes, check for breadcrumb file.
+         If it exists, start the service and delete the breadcrumb.
+         ================================================================ -->
+    <SetProperty Id="StartServiceUpgrade"
+                 Before="StartServiceUpgrade"
+                 Sequence="execute"
+                 Value="&quot;[SystemFolder]cmd.exe&quot; /c &quot;if exist &quot;[TempFolder]WinSmtpRelay_WasRunning.tmp&quot; ( del /q &quot;[TempFolder]WinSmtpRelay_WasRunning.tmp&quot; &amp; sc start WinSmtpRelay )&quot;"
+                 Condition="WIX_UPGRADE_DETECTED" />
+
+    <CustomAction Id="StartServiceUpgrade"
+                  BinaryRef="Wix4UtilCA_X86"
+                  DllEntry="WixQuietExec"
+                  Execute="deferred"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <!-- ================================================================
+         CLEANUP: Remove breadcrumb if install is cancelled/rolled back.
+         ================================================================ -->
+    <SetProperty Id="CleanupBreadcrumb"
+                 Before="CleanupBreadcrumb"
+                 Sequence="execute"
+                 Value="&quot;[SystemFolder]cmd.exe&quot; /c &quot;del /q &quot;[TempFolder]WinSmtpRelay_WasRunning.tmp&quot; 2&gt;nul&quot;"
+                 Condition="WIX_UPGRADE_DETECTED" />
+
+    <CustomAction Id="CleanupBreadcrumb"
+                  BinaryRef="Wix4UtilCA_X86"
+                  DllEntry="WixQuietExec"
+                  Execute="rollback"
+                  Return="ignore"
+                  Impersonate="no" />
+
+    <!-- Schedule custom actions -->
+    <InstallExecuteSequence>
+      <!-- Detect state BEFORE InstallInitialize (service is still running) -->
+      <Custom Action="DetectServiceRunning" Before="InstallInitialize"
+              Condition="WIX_UPGRADE_DETECTED" />
+
+      <!-- Rollback CA to clean up breadcrumb on failure -->
+      <Custom Action="CleanupBreadcrumb" After="InstallInitialize"
+              Condition="WIX_UPGRADE_DETECTED" />
+
+      <!-- Start service at end of install if it was running before -->
+      <Custom Action="StartServiceUpgrade" Before="InstallFinalize"
+              Condition="WIX_UPGRADE_DETECTED" />
+    </InstallExecuteSequence>
+
+  </Fragment>
+
+</Wix>
