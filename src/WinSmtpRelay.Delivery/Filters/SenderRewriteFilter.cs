@@ -1,20 +1,18 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MimeKit;
-using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
 
 namespace WinSmtpRelay.Delivery.Filters;
 
 public class SenderRewriteFilter : IMessageFilter
 {
-    private readonly MessageFilterOptions _options;
+    private readonly IRuntimeConfigCache _configCache;
     private readonly ILogger<SenderRewriteFilter> _logger;
 
-    public SenderRewriteFilter(IOptions<MessageFilterOptions> options, ILogger<SenderRewriteFilter> logger)
+    public SenderRewriteFilter(IRuntimeConfigCache configCache, ILogger<SenderRewriteFilter> logger)
     {
-        _options = options.Value;
+        _configCache = configCache;
         _logger = logger;
     }
 
@@ -22,10 +20,11 @@ public class SenderRewriteFilter : IMessageFilter
 
     public async Task<MessageFilterResult> FilterAsync(MessageFilterContext context, CancellationToken cancellationToken = default)
     {
-        if (_options.SenderRewrites.Count == 0)
+        var rules = await _configCache.GetSenderRewriteRulesAsync(cancellationToken);
+        if (rules.Count == 0)
             return MessageFilterResult.Accepted();
 
-        var matchingRule = _options.SenderRewrites.FirstOrDefault(r =>
+        var matchingRule = rules.FirstOrDefault(r =>
             !string.IsNullOrWhiteSpace(r.FromPattern) &&
             Regex.IsMatch(context.Sender, r.FromPattern, RegexOptions.IgnoreCase));
 

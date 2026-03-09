@@ -14,17 +14,20 @@ public class SmtpDeliveryService : IDeliveryService
 {
     private readonly IMxResolver _mxResolver;
     private readonly DeliveryOptions _config;
+    private readonly IRuntimeConfigCache _configCache;
     private readonly DkimSigningService _dkimSigner;
     private readonly ILogger<SmtpDeliveryService> _logger;
 
     public SmtpDeliveryService(
         IMxResolver mxResolver,
         IOptions<DeliveryOptions> options,
+        IRuntimeConfigCache configCache,
         DkimSigningService dkimSigner,
         ILogger<SmtpDeliveryService> logger)
     {
         _mxResolver = mxResolver;
         _config = options.Value;
+        _configCache = configCache;
         _dkimSigner = dkimSigner;
         _logger = logger;
     }
@@ -70,14 +73,19 @@ public class SmtpDeliveryService : IDeliveryService
         string domain,
         CancellationToken cancellationToken)
     {
-        // 1. Per-domain route takes highest priority
-        var route = FindDomainRoute(domain);
-        if (route != null)
+        // 1. Per-domain route takes highest priority (from DB cache)
+        var route = await FindDomainRouteAsync(domain, cancellationToken);
+        if (route is { SendConnector: not null })
         {
-            _logger.LogDebug("Using domain route {Pattern} for domain {Domain}", route.DomainPattern, domain);
+            var connector = route.SendConnector;
+            _logger.LogDebug("Using domain route {Pattern} via connector {Connector} for domain {Domain}",
+                route.DomainPattern, connector.Name, domain);
             return await SendViaSmtpAsync(
                 mimeMessage, sender, recipients,
-                route.Host, route.Port, route.Username, route.Password,
+                connector.SmartHost ?? "", connector.SmartHostPort,
+                connector.Username, connector.EncryptedPassword,
+                connector.OpportunisticTls,
+                connector.ConnectTimeoutSeconds,
                 cancellationToken);
         }
 
@@ -88,6 +96,8 @@ public class SmtpDeliveryService : IDeliveryService
                 mimeMessage, sender, recipients,
                 _config.SmartHost, _config.SmartHostPort,
                 _config.SmartHostUsername, _config.SmartHostPassword,
+                _config.OpportunisticTls,
+                _config.ConnectTimeoutSeconds,
                 cancellationToken);
         }
 
@@ -99,7 +109,8 @@ public class SmtpDeliveryService : IDeliveryService
         {
             try
             {
-                return await SendViaSmtpAsync(mimeMessage, sender, recipients, mxHost, 25, null, null, cancellationToken);
+                return await SendViaSmtpAsync(mimeMessage, sender, recipients, mxHost, 25, null, null,
+                    _config.OpportunisticTls, _config.ConnectTimeoutSeconds, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -120,9 +131,10 @@ public class SmtpDeliveryService : IDeliveryService
         }).ToList();
     }
 
-    internal DomainRouteOptions? FindDomainRoute(string domain)
+    internal async Task<DomainRoute?> FindDomainRouteAsync(string domain, CancellationToken ct = default)
     {
-        foreach (var route in _config.DomainRoutes)
+        var routes = await _configCache.GetDomainRoutesAsync(ct);
+        foreach (var route in routes)
         {
             var pattern = route.DomainPattern;
             if (string.IsNullOrWhiteSpace(pattern)) continue;
@@ -150,20 +162,22 @@ public class SmtpDeliveryService : IDeliveryService
         int port,
         string? username,
         string? password,
+        bool opportunisticTls,
+        int connectTimeoutSeconds,
         CancellationToken cancellationToken)
     {
         using var client = new SmtpClient(new MailKitProtocolLogger(_logger));
-        client.Timeout = _config.ConnectTimeoutSeconds * 1000;
+        client.Timeout = connectTimeoutSeconds * 1000;
 
-        var tlsOption = _config.OpportunisticTls
+        var tlsOption = opportunisticTls
             ? SecureSocketOptions.StartTlsWhenAvailable
             : SecureSocketOptions.None;
 
         _logger.LogDebug("Connecting to {Host}:{Port} (TLS={TlsOption}, Timeout={Timeout}s)",
-            host, port, tlsOption, _config.ConnectTimeoutSeconds);
+            host, port, tlsOption, connectTimeoutSeconds);
 
         using var connectCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        connectCts.CancelAfter(TimeSpan.FromSeconds(_config.ConnectTimeoutSeconds));
+        connectCts.CancelAfter(TimeSpan.FromSeconds(connectTimeoutSeconds));
 
         await client.ConnectAsync(host, port, tlsOption, connectCts.Token);
 

@@ -1,0 +1,154 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
+
+namespace WinSmtpRelay.Storage;
+
+/// <summary>
+/// Singleton in-memory cache for runtime-editable configuration.
+/// Loads from SQLite on first access, invalidated by Admin API on changes.
+/// Thread-safe: uses SemaphoreSlim to prevent concurrent DB loads.
+/// </summary>
+public class RuntimeConfigCache : IRuntimeConfigCache
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<RuntimeConfigCache> _logger;
+    private readonly SemaphoreSlim _lock = new(1, 1);
+
+    private volatile IReadOnlyList<string>? _acceptedDomains;
+    private volatile IReadOnlyList<DomainRoute>? _domainRoutes;
+    private volatile IReadOnlyList<HeaderRewriteEntry>? _headerRewriteRules;
+    private volatile IReadOnlyList<SenderRewriteEntry>? _senderRewriteRules;
+
+    public RuntimeConfigCache(IServiceScopeFactory scopeFactory, ILogger<RuntimeConfigCache> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+    }
+
+    public async Task<IReadOnlyList<string>> GetAcceptedDomainsAsync(CancellationToken ct = default)
+    {
+        if (_acceptedDomains is { } cached)
+            return cached;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            if (_acceptedDomains is { } cached2)
+                return cached2;
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var domains = await db.AcceptedDomains
+                .AsNoTracking()
+                .Select(d => d.Domain)
+                .ToListAsync(ct);
+
+            _acceptedDomains = domains;
+            _logger.LogDebug("Loaded {Count} accepted domains into cache", domains.Count);
+            return domains;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<DomainRoute>> GetDomainRoutesAsync(CancellationToken ct = default)
+    {
+        if (_domainRoutes is { } cached)
+            return cached;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            if (_domainRoutes is { } cached2)
+                return cached2;
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var routes = await db.DomainRoutes
+                .AsNoTracking()
+                .Include(r => r.SendConnector)
+                .OrderBy(r => r.SortOrder)
+                .ToListAsync(ct);
+
+            _domainRoutes = routes;
+            _logger.LogDebug("Loaded {Count} domain routes into cache", routes.Count);
+            return routes;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<HeaderRewriteEntry>> GetHeaderRewriteRulesAsync(CancellationToken ct = default)
+    {
+        if (_headerRewriteRules is { } cached)
+            return cached;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            if (_headerRewriteRules is { } cached2)
+                return cached2;
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var rules = await db.HeaderRewriteEntries
+                .AsNoTracking()
+                .Where(r => r.IsEnabled)
+                .OrderBy(r => r.SortOrder)
+                .ToListAsync(ct);
+
+            _headerRewriteRules = rules;
+            _logger.LogDebug("Loaded {Count} header rewrite rules into cache", rules.Count);
+            return rules;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<SenderRewriteEntry>> GetSenderRewriteRulesAsync(CancellationToken ct = default)
+    {
+        if (_senderRewriteRules is { } cached)
+            return cached;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            if (_senderRewriteRules is { } cached2)
+                return cached2;
+
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<RelayDbContext>();
+            var rules = await db.SenderRewriteEntries
+                .AsNoTracking()
+                .Where(r => r.IsEnabled)
+                .OrderBy(r => r.SortOrder)
+                .ToListAsync(ct);
+
+            _senderRewriteRules = rules;
+            _logger.LogDebug("Loaded {Count} sender rewrite rules into cache", rules.Count);
+            return rules;
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public void Invalidate()
+    {
+        _acceptedDomains = null;
+        _domainRoutes = null;
+        _headerRewriteRules = null;
+        _senderRewriteRules = null;
+        _logger.LogInformation("Runtime configuration cache invalidated");
+    }
+}

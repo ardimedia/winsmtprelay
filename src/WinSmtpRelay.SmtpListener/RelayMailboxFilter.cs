@@ -17,6 +17,7 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
     private readonly BackupMxOptions _backupMxOptions;
     private readonly EmailAuthenticationService _emailAuth;
     private readonly RateLimiter _rateLimiter;
+    private readonly IRuntimeConfigCache _configCache;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<RelayMailboxFilter> _logger;
 
@@ -25,6 +26,7 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         IOptions<BackupMxOptions> backupMxOptions,
         EmailAuthenticationService emailAuth,
         RateLimiter rateLimiter,
+        IRuntimeConfigCache configCache,
         IServiceScopeFactory scopeFactory,
         ILogger<RelayMailboxFilter> logger)
     {
@@ -32,6 +34,7 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         _backupMxOptions = backupMxOptions.Value;
         _emailAuth = emailAuth;
         _rateLimiter = rateLimiter;
+        _configCache = configCache;
         _scopeFactory = scopeFactory;
         _logger = logger;
     }
@@ -126,7 +129,7 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         return true;
     }
 
-    public override Task<bool> CanDeliverToAsync(
+    public override async Task<bool> CanDeliverToAsync(
         ISessionContext context,
         IMailbox to,
         IMailbox from,
@@ -138,24 +141,25 @@ public class RelayMailboxFilter : MailboxFilter, IMailboxFilter
         if (_backupMxOptions.Enabled &&
             _backupMxOptions.Domains.Any(d => string.Equals(d, recipientDomain, StringComparison.OrdinalIgnoreCase)))
         {
-            return Task.FromResult(true);
+            return true;
         }
 
-        // If accepted domains are configured, check recipient domain
-        if (_options.AcceptedDomains.Count > 0)
+        // If accepted domains are configured, check recipient domain (from DB cache)
+        var acceptedDomains = await _configCache.GetAcceptedDomainsAsync(cancellationToken);
+        if (acceptedDomains.Count > 0)
         {
-            var accepted = _options.AcceptedDomains.Any(d =>
+            var accepted = acceptedDomains.Any(d =>
                 string.Equals(d, recipientDomain, StringComparison.OrdinalIgnoreCase));
 
             if (!accepted)
             {
                 _logger.LogWarning("Recipient {Recipient} rejected: domain {Domain} not in accepted domains",
                     to.AsAddress(), recipientDomain);
-                return Task.FromResult(false);
+                return false;
             }
         }
 
-        return Task.FromResult(true);
+        return true;
     }
 
     private static string? GetAuthenticatedUser(ISessionContext context)

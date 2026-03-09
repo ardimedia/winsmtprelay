@@ -1,19 +1,17 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using MimeKit;
-using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
 
 namespace WinSmtpRelay.Delivery.Filters;
 
 public class HeaderRewriteFilter : IMessageFilter
 {
-    private readonly MessageFilterOptions _options;
+    private readonly IRuntimeConfigCache _configCache;
     private readonly ILogger<HeaderRewriteFilter> _logger;
 
-    public HeaderRewriteFilter(IOptions<MessageFilterOptions> options, ILogger<HeaderRewriteFilter> logger)
+    public HeaderRewriteFilter(IRuntimeConfigCache configCache, ILogger<HeaderRewriteFilter> logger)
     {
-        _options = options.Value;
+        _configCache = configCache;
         _logger = logger;
     }
 
@@ -21,13 +19,14 @@ public class HeaderRewriteFilter : IMessageFilter
 
     public async Task<MessageFilterResult> FilterAsync(MessageFilterContext context, CancellationToken cancellationToken = default)
     {
-        if (_options.HeaderRewrites.Count == 0)
+        var rules = await _configCache.GetHeaderRewriteRulesAsync(cancellationToken);
+        if (rules.Count == 0)
             return MessageFilterResult.Accepted();
 
         var mimeMessage = await MimeMessage.LoadAsync(new MemoryStream(context.RawMessage), cancellationToken);
         var modified = false;
 
-        foreach (var rule in _options.HeaderRewrites)
+        foreach (var rule in rules)
         {
             if (string.IsNullOrWhiteSpace(rule.HeaderName)) continue;
 

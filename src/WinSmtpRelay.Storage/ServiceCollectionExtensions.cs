@@ -25,6 +25,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRateLimitSettingsService, RateLimitSettingsService>();
         services.AddScoped<IMessageFilterService, MessageFilterService>();
 
+        // Singleton cache for runtime-editable config (invalidated by Admin API)
+        services.AddSingleton<IRuntimeConfigCache, RuntimeConfigCache>();
+
         return services;
     }
 }

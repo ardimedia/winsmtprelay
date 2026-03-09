@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using MimeKit;
-using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
 using WinSmtpRelay.Delivery.Filters;
 
 namespace WinSmtpRelay.Delivery.Tests;
@@ -27,9 +26,8 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public async Task HeaderRewriteFilter_NoRules_AcceptsUnmodified()
     {
-        var filter = new HeaderRewriteFilter(
-            Options.Create(new MessageFilterOptions()),
-            NullLogger<HeaderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache();
+        var filter = new HeaderRewriteFilter(cache, NullLogger<HeaderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -48,12 +46,11 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public async Task HeaderRewriteFilter_SetHeader_ModifiesMessage()
     {
-        var filter = new HeaderRewriteFilter(
-            Options.Create(new MessageFilterOptions
-            {
-                HeaderRewrites = [new HeaderRewriteRule { HeaderName = "X-Custom", Action = "Set", NewValue = "test-value" }]
-            }),
-            NullLogger<HeaderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache
+        {
+            HeaderRewriteRules = [new HeaderRewriteEntry { HeaderName = "X-Custom", Action = "Set", NewValue = "test-value", IsEnabled = true }]
+        };
+        var filter = new HeaderRewriteFilter(cache, NullLogger<HeaderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -83,12 +80,11 @@ public class MessageFilterTests
         msg.WriteTo(ms);
         raw = ms.ToArray();
 
-        var filter = new HeaderRewriteFilter(
-            Options.Create(new MessageFilterOptions
-            {
-                HeaderRewrites = [new HeaderRewriteRule { HeaderName = "X-ToRemove", Action = "Remove" }]
-            }),
-            NullLogger<HeaderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache
+        {
+            HeaderRewriteRules = [new HeaderRewriteEntry { HeaderName = "X-ToRemove", Action = "Remove", IsEnabled = true }]
+        };
+        var filter = new HeaderRewriteFilter(cache, NullLogger<HeaderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -110,9 +106,8 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public async Task SenderRewriteFilter_NoRules_AcceptsUnmodified()
     {
-        var filter = new SenderRewriteFilter(
-            Options.Create(new MessageFilterOptions()),
-            NullLogger<SenderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache();
+        var filter = new SenderRewriteFilter(cache, NullLogger<SenderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -131,12 +126,11 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public async Task SenderRewriteFilter_MatchingRule_RewritesSender()
     {
-        var filter = new SenderRewriteFilter(
-            Options.Create(new MessageFilterOptions
-            {
-                SenderRewrites = [new SenderRewriteRule { FromPattern = @".*@internal\.com", ToAddress = "noreply@public.com" }]
-            }),
-            NullLogger<SenderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache
+        {
+            SenderRewriteRules = [new SenderRewriteEntry { FromPattern = @".*@internal\.com", ToAddress = "noreply@public.com", IsEnabled = true }]
+        };
+        var filter = new SenderRewriteFilter(cache, NullLogger<SenderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -159,12 +153,11 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public async Task SenderRewriteFilter_NonMatchingRule_NoChange()
     {
-        var filter = new SenderRewriteFilter(
-            Options.Create(new MessageFilterOptions
-            {
-                SenderRewrites = [new SenderRewriteRule { FromPattern = @".*@other\.com", ToAddress = "noreply@public.com" }]
-            }),
-            NullLogger<SenderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache
+        {
+            SenderRewriteRules = [new SenderRewriteEntry { FromPattern = @".*@other\.com", ToAddress = "noreply@public.com", IsEnabled = true }]
+        };
+        var filter = new SenderRewriteFilter(cache, NullLogger<SenderRewriteFilter>.Instance);
 
         var context = new MessageFilterContext
         {
@@ -183,12 +176,9 @@ public class MessageFilterTests
     [TestCategory("Unit")]
     public void FilterOrder_HeaderBeforeSender()
     {
-        var headerFilter = new HeaderRewriteFilter(
-            Options.Create(new MessageFilterOptions()),
-            NullLogger<HeaderRewriteFilter>.Instance);
-        var senderFilter = new SenderRewriteFilter(
-            Options.Create(new MessageFilterOptions()),
-            NullLogger<SenderRewriteFilter>.Instance);
+        var cache = new StubRuntimeConfigCache();
+        var headerFilter = new HeaderRewriteFilter(cache, NullLogger<HeaderRewriteFilter>.Instance);
+        var senderFilter = new SenderRewriteFilter(cache, NullLogger<SenderRewriteFilter>.Instance);
 
         Assert.IsTrue(headerFilter.Order < senderFilter.Order);
     }

@@ -280,17 +280,19 @@ public static class AdminEndpoints
         ep.MapGet("/", async (IAcceptedDomainService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetAllAsync(ct)));
 
-        ep.MapPost("/", async (CreateAcceptedDomainRequest req, IAcceptedDomainService svc, CancellationToken ct) =>
+        ep.MapPost("/", async (CreateAcceptedDomainRequest req, IAcceptedDomainService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             if (await svc.ExistsAsync(req.Domain, ct))
                 return Results.Conflict(new { Error = $"Domain '{req.Domain}' already exists" });
             var created = await svc.CreateAsync(req.Domain, ct);
+            cache.Invalidate();
             return Results.Created($"/api/domains/accepted/{created.Id}", created);
         });
 
-        ep.MapDelete("/{id:int}", async (int id, IAcceptedDomainService svc, CancellationToken ct) =>
+        ep.MapDelete("/{id:int}", async (int id, IAcceptedDomainService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             await svc.DeleteAsync(id, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Accepted domain deleted" });
         });
     }
@@ -329,22 +331,25 @@ public static class AdminEndpoints
         ep.MapGet("/", async (ISendConnectorService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetAllAsync(ct)));
 
-        ep.MapPost("/", async (SendConnector connector, ISendConnectorService svc, CancellationToken ct) =>
+        ep.MapPost("/", async (SendConnector connector, ISendConnectorService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             var created = await svc.CreateAsync(connector, ct);
+            cache.Invalidate();
             return Results.Created($"/api/connectors/send/{created.Id}", created);
         });
 
-        ep.MapPut("/{id:int}", async (int id, SendConnector connector, ISendConnectorService svc, CancellationToken ct) =>
+        ep.MapPut("/{id:int}", async (int id, SendConnector connector, ISendConnectorService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             connector.Id = id;
             await svc.UpdateAsync(connector, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Send connector updated" });
         });
 
-        ep.MapDelete("/{id:int}", async (int id, ISendConnectorService svc, CancellationToken ct) =>
+        ep.MapDelete("/{id:int}", async (int id, ISendConnectorService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             await svc.DeleteAsync(id, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Send connector deleted" });
         });
     }
@@ -356,22 +361,25 @@ public static class AdminEndpoints
         ep.MapGet("/", async (IDomainRouteService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetAllAsync(ct)));
 
-        ep.MapPost("/", async (DomainRoute route, IDomainRouteService svc, CancellationToken ct) =>
+        ep.MapPost("/", async (DomainRoute route, IDomainRouteService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             var created = await svc.CreateAsync(route, ct);
+            cache.Invalidate();
             return Results.Created($"/api/routes/{created.Id}", created);
         });
 
-        ep.MapPut("/{id:int}", async (int id, DomainRoute route, IDomainRouteService svc, CancellationToken ct) =>
+        ep.MapPut("/{id:int}", async (int id, DomainRoute route, IDomainRouteService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             route.Id = id;
             await svc.UpdateAsync(route, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Domain route updated" });
         });
 
-        ep.MapDelete("/{id:int}", async (int id, IDomainRouteService svc, CancellationToken ct) =>
+        ep.MapDelete("/{id:int}", async (int id, IDomainRouteService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             await svc.DeleteAsync(id, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Domain route deleted" });
         });
     }
@@ -426,22 +434,25 @@ public static class AdminEndpoints
         headers.MapGet("/", async (IMessageFilterService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetHeaderRulesAsync(ct)));
 
-        headers.MapPost("/", async (HeaderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        headers.MapPost("/", async (HeaderRewriteEntry rule, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             var created = await svc.CreateHeaderRuleAsync(rule, ct);
+            cache.Invalidate();
             return Results.Created($"/api/filters/headers/{created.Id}", created);
         });
 
-        headers.MapPut("/{id:int}", async (int id, HeaderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        headers.MapPut("/{id:int}", async (int id, HeaderRewriteEntry rule, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             rule.Id = id;
             await svc.UpdateHeaderRuleAsync(rule, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Header rewrite rule updated" });
         });
 
-        headers.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, CancellationToken ct) =>
+        headers.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             await svc.DeleteHeaderRuleAsync(id, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Header rewrite rule deleted" });
         });
 
@@ -450,22 +461,25 @@ public static class AdminEndpoints
         senders.MapGet("/", async (IMessageFilterService svc, CancellationToken ct) =>
             Results.Ok(await svc.GetSenderRulesAsync(ct)));
 
-        senders.MapPost("/", async (SenderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        senders.MapPost("/", async (SenderRewriteEntry rule, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             var created = await svc.CreateSenderRuleAsync(rule, ct);
+            cache.Invalidate();
             return Results.Created($"/api/filters/senders/{created.Id}", created);
         });
 
-        senders.MapPut("/{id:int}", async (int id, SenderRewriteEntry rule, IMessageFilterService svc, CancellationToken ct) =>
+        senders.MapPut("/{id:int}", async (int id, SenderRewriteEntry rule, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             rule.Id = id;
             await svc.UpdateSenderRuleAsync(rule, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Sender rewrite rule updated" });
         });
 
-        senders.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, CancellationToken ct) =>
+        senders.MapDelete("/{id:int}", async (int id, IMessageFilterService svc, IRuntimeConfigCache cache, CancellationToken ct) =>
         {
             await svc.DeleteSenderRuleAsync(id, ct);
+            cache.Invalidate();
             return Results.Ok(new { Message = "Sender rewrite rule deleted" });
         });
     }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using WinSmtpRelay.Core.Configuration;
 using WinSmtpRelay.Core.Interfaces;
+using WinSmtpRelay.Core.Models;
 using WinSmtpRelay.Delivery;
 using WinSmtpRelay.Security;
 
@@ -10,136 +11,98 @@ namespace WinSmtpRelay.Delivery.Tests;
 [TestClass]
 public class DomainRoutingTests
 {
-    private SmtpDeliveryService CreateService(DeliveryOptions options)
+    private SmtpDeliveryService CreateService(List<DomainRoute>? routes = null)
     {
         var mxResolver = new StubMxResolver();
         var dkimSigner = new DkimSigningService(
             Options.Create(new DkimOptions()),
             NullLogger<DkimSigningService>.Instance);
 
+        var cache = new StubRuntimeConfigCache { DomainRoutes = routes ?? [] };
+
         return new SmtpDeliveryService(
             mxResolver,
-            Options.Create(options),
+            Options.Create(new DeliveryOptions()),
+            cache,
             dkimSigner,
             NullLogger<SmtpDeliveryService>.Instance);
     }
 
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void FindDomainRoute_ExactMatch_ReturnsRoute()
+    private static DomainRoute CreateRoute(string pattern, string host, int port = 587)
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "example.com", Host = "relay.sendgrid.net", Port = 587 }
-            ]
-        };
-
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("example.com");
-
-        Assert.IsNotNull(route);
-        Assert.AreEqual("relay.sendgrid.net", route.Host);
+        var connector = new SendConnector { Name = host, SmartHost = host, SmartHostPort = port };
+        return new DomainRoute { DomainPattern = pattern, SendConnector = connector };
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_ExactMatch_CaseInsensitive()
+    public async Task FindDomainRouteAsync_ExactMatch_ReturnsRoute()
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "Example.COM", Host = "relay.sendgrid.net", Port = 587 }
-            ]
-        };
+        var service = CreateService([CreateRoute("example.com", "relay.sendgrid.net")]);
+        var route = await service.FindDomainRouteAsync("example.com");
 
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("example.com");
+        Assert.IsNotNull(route);
+        Assert.AreEqual("relay.sendgrid.net", route.SendConnector!.SmartHost);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task FindDomainRouteAsync_ExactMatch_CaseInsensitive()
+    {
+        var service = CreateService([CreateRoute("Example.COM", "relay.sendgrid.net")]);
+        var route = await service.FindDomainRouteAsync("example.com");
         Assert.IsNotNull(route);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_WildcardMatch_Subdomain()
+    public async Task FindDomainRouteAsync_WildcardMatch_Subdomain()
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "*.example.com", Host = "smtp.brevo.com", Port = 587 }
-            ]
-        };
-
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("sub.example.com");
+        var service = CreateService([CreateRoute("*.example.com", "smtp.brevo.com")]);
+        var route = await service.FindDomainRouteAsync("sub.example.com");
         Assert.IsNotNull(route);
-        Assert.AreEqual("smtp.brevo.com", route.Host);
+        Assert.AreEqual("smtp.brevo.com", route.SendConnector!.SmartHost);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_WildcardMatch_BaseDomain()
+    public async Task FindDomainRouteAsync_WildcardMatch_BaseDomain()
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "*.example.com", Host = "smtp.brevo.com", Port = 587 }
-            ]
-        };
-
-        var service = CreateService(options);
+        var service = CreateService([CreateRoute("*.example.com", "smtp.brevo.com")]);
         // *.example.com should also match example.com itself
-        var route = service.FindDomainRoute("example.com");
+        var route = await service.FindDomainRouteAsync("example.com");
         Assert.IsNotNull(route);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_NoMatch_ReturnsNull()
+    public async Task FindDomainRouteAsync_NoMatch_ReturnsNull()
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "example.com", Host = "relay.sendgrid.net", Port = 587 }
-            ]
-        };
-
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("other.com");
+        var service = CreateService([CreateRoute("example.com", "relay.sendgrid.net")]);
+        var route = await service.FindDomainRouteAsync("other.com");
         Assert.IsNull(route);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_EmptyRoutes_ReturnsNull()
+    public async Task FindDomainRouteAsync_EmptyRoutes_ReturnsNull()
     {
-        var options = new DeliveryOptions();
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("example.com");
+        var service = CreateService();
+        var route = await service.FindDomainRouteAsync("example.com");
         Assert.IsNull(route);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void FindDomainRoute_FirstMatchWins()
+    public async Task FindDomainRouteAsync_FirstMatchWins()
     {
-        var options = new DeliveryOptions
-        {
-            DomainRoutes =
-            [
-                new DomainRouteOptions { DomainPattern = "example.com", Host = "first.host", Port = 587 },
-                new DomainRouteOptions { DomainPattern = "example.com", Host = "second.host", Port = 587 }
-            ]
-        };
-
-        var service = CreateService(options);
-        var route = service.FindDomainRoute("example.com");
+        var service = CreateService([
+            CreateRoute("example.com", "first.host"),
+            CreateRoute("example.com", "second.host")
+        ]);
+        var route = await service.FindDomainRouteAsync("example.com");
         Assert.IsNotNull(route);
-        Assert.AreEqual("first.host", route.Host);
+        Assert.AreEqual("first.host", route.SendConnector!.SmartHost);
     }
 
     private class StubMxResolver : IMxResolver
